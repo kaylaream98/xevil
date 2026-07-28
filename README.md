@@ -244,6 +244,10 @@ UNIX code) and **Michael Judge** (Windows front end, sound), with artwork by
 **Comrade.Cid** and others. XEvil 2.5 modernization, 2026. (Full credits are in
 the in-game license screen — run `xevil -info`.)
 
+XEvil 2.5 is built on [lvella/xevil](https://github.com/lvella/xevil), the
+upstream preservation of the original 2.02 sources whose 64-bit and
+modern-compiler fixes made this work possible.
+
 XEvil is free software under the **GNU General Public License** (version 2 or
 later); see `gpl.txt`. It comes with absolutely no warranty. XEvil(TM) is a
 trademark of its authors — see the notice in `cmn/game.cpp` before changing the
