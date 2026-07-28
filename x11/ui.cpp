@@ -36,6 +36,7 @@ extern "C" {
 #endif
 #include <X11/Xos.h>
 #include <X11/keysym.h>
+#include <X11/XKBlib.h>
 #include <X11/cursorfont.h>
 #include <X11/Xatom.h>
 }
@@ -1181,8 +1182,8 @@ void Ui::learn_controls_CB(Panel* panel,void* value,void* closure) {
       << " player: The "
       << (ui->lControls[dpyNum].which ? "second" : "first") << " key for <" 
       << ui->keysNames[ui->lControls[dpyNum].key] << "> is "
-      << keysym_to_string(XKeycodeToKeysym(ui->xvars.dpy[dpyNum],
-					  event->xkey.keycode,0))
+      << keysym_to_string(XkbKeycodeToKeysym(ui->xvars.dpy[dpyNum],
+					  event->xkey.keycode,0,0))
       << "." << "\n" << "\n";
   ui->keycodes[dpyNum][ui->lControls[dpyNum].input]
     [ui->lControls[dpyNum].key][ui->lControls[dpyNum].which] =
@@ -1615,8 +1616,8 @@ void Ui::controls_redraw(int dpyNum) {
       for (int which = 0; which < 2; which++) {
         for (int i = 0; i < 2; i++) {
           unsigned int keycode = keycodes[dpyNum][input][nn][which];
-          keymaps[input][nn][which][i] = 
-            XKeycodeToKeysym(xvars.dpy[dpyNum],keycode,i);
+          keymaps[input][nn][which][i] =
+            XkbKeycodeToKeysym(xvars.dpy[dpyNum],keycode,0,i);
         }
       }
     }
