@@ -500,3 +500,571 @@ machinery/turret tile on hazard stripes) and `!DOG0_RU.BMP` (a cheerful white
 cartoon dog, tongue out) use leading `AAA`/`!` so the work-in-progress files sort
 to the top of the folder — the 1990s equivalent of pinning a tab. Nothing hidden,
 but a nice human trace of how the art actually got made.
+
+---
+
+# Part III — The last days of XEvil (the October 2000 snapshot)
+
+Two archives surfaced that change what we know: `xevilsrc2.02r2.zip`, the official
+source release recovered from archive.org, and `xevilsrc102200.zip`, a developer
+snapshot nobody has looked at in twenty-six years. Read against this repository,
+they rewrite the end of XEvil's history. Throughout, **A** = the official 2.02r2
+zip, **B** = the October 2000 developer zip, **C** = lvella's 2011 preservation
+(this repo's `master`). Unqualified `file:line` citations below are to **`master`**;
+citations prefixed `A` are into the 2.02r2 zip.
+
+## The timeline, corrected
+
+**A, the "2.02r2 source release," is not the 2.02 source.** Its file dates fall
+into two clumps and nothing in between: **810 files dated 19–20 January 2000**
+(the GPL release), and **eighteen files re-edited 19–23 March 2003**, plus 138
+directory entries stamped `2003-03-23 15:24` — the signature of someone unzipping
+an old archive into a fresh tree, editing, and re-zipping. The eighteen are
+`config.mk`, `makefile`, `unzipxevil`, `win32/xevil.rc`, `cmn/{game,game_style,
+locator,intel,area,utils}.*` and `x11/{ui,panel,main,serverping}.cpp`.
+
+What was that 2003 session? A compatibility pass. `config.mk` gains a target that
+says so out loud:
+
+```make
+# Versions of Linux with gcc 3.2.
+# Added no-deprecated option so wouldn't complain about using old-style c++
+# header names, eg <iostream.h> instead of <iostream>
+i686:
+```
+and the edited sources gain exactly the includes gcc 3.2 stopped providing for
+free — `#include <stdlib.h> // For exit().` in `cmn/utils.h`, `#include
+<iostream.h>` in `x11/panel.cpp` and `x11/serverping.cpp`. `config.mk:42` is where
+the label lives: `VERSION = 2.02r2`.
+
+So **XEvil 2.02r2 is a March 2003 make-it-build-again re-release of the January
+2000 source tree.** Its content is 2.0-era. The give-aways are everywhere: it
+still ships `xevil-2.0.spec`; its `makefile` still packages `.tar.Z` through a
+`$(COMPRESS)` macro; its `win32/resource.h` is dated 2 March 1999.
+
+And it demonstrably predates 2.02. `Flying::act()` in the developer tree carries
+Hardt's own version note in place of a preprocessor guard
+(`cmn/physical.cpp:8357-8359`):
+
+```c
+//#if WIN32  Took it out after XEvil 2.01
+  acceleration = (int)(acceleration * 1.5);
+//#endif
+```
+A change made *after 2.01* — and the 2.02r2 release still has the live `#if WIN32`
+at A `cmn/physical.cpp:8203`. The official "2.02r2" source does not contain the
+2.02 work.
+
+**B is the newest thing that exists.** Its most recent file is `x11/ui.cpp` at
+**21 August 2000, 07:00**; the zip is named for the day it was packaged, 22
+October 2000.
+
+**C is B.** Byte for byte:
+
+```
+$ diff -rq B C   # C = git archive 4386fbc ("Satan's original version")
+Only in B/x11/gen_xpm: explosion, fire_explosion, n_protection,
+                       phys_mover, t_protection, x_protection
+```
+— six *empty* directories, the only thing git cannot store. Every one of the 1432
+files hashes identically (`md5sum` over the sorted file list: `5a5dc03d…` for
+both). Lucas Vella's "Satan's original version" is `xevilsrc102200.zip`.
+
+So the order, newest first, is **C ≡ B (Aug 2000) → A (Jan 2000 content, 2003
+packaging)**. The official source release is the *oldest* of the three. Which
+means:
+
+> **Everyone who has built XEvil from source since 2011 — including XEvil 2.5 —
+> has been building Steve Hardt's private, unreleased development branch, not the
+> game he shipped.**
+
+One correction to Part II falls out of this. `config.mk`'s `VERSION = 2.1` is not
+drift: A proves the field tracked the real label (`2.02r2`), so the `2.1` sitting
+in this repo is Hardt's *next* version number. XEvil 2.1 was in development.
+
+## Did lvella lose anything? No.
+
+The treasure question has a clean answer: **nothing was lost.** No file, no
+comment, no asset, no stray artifact — including the editor backup discussed
+below — is in B and missing from C. The 27 commits between `4386fbc` and `master`
+are 64-bit/clang/OSX/Raspberry-Pi build fixes by Vella, denilsonsa and Lee
+Bradley; not one line of gameplay changed. The preservation is exact.
+
+## The unreleased XEvil
+
+Because A is the 2.0-era tree, everything below is work Steve Hardt did **between
+19 January and 21 August 2000** that appears in no official source release. Since
+C ≡ B, every citation is a live path in this repository.
+
+### Two creatures the world never met
+
+**The Zombie** (`cmn/actual.h:1863`, art in `x11/gen_xpm/zombie/`, 23 XPM frames
+plus 8 "duplicate_of" aliases, and 14 BMPs in `win32/res/`): a
+green-skinned shambler in torn shirt and blue jeans, arms out, fully animated
+walk/climb/attack cycles and a gory death sprite. Not a joke character —
+`cmn/bitmaps/zombie/zombie.bitmaps` gives him **400 health** (tied with the
+Enforcer for the toughest thing on two legs, double the Hero's 200) and a body
+slam doing **75 free damage**, the hardest melee hit in the game (Hero and Ninja
+do 50). `False, /* biological */` (line 82) makes him facehugger-proof; he bleeds
+`DROPLET_GREEN_BLOOD` (line 83) like the Alien; `corpseHealth 0` means he leaves
+nothing behind. And `True, /* potentialEnemy */` with `enemyWeight 25` (line 207)
+— **he was wired into the normal enemy rotation and ready to ship.**
+
+**The Chicken** (`cmn/actual.h:2334`, art in `x11/gen_xpm/chicken/`): a white-and-
+brown hen with a red comb and yellow feet, complete with flight frames and a
+peck attack. 185 health, flying (`gravTime 3`), 15/20 melee damage. It is
+`potentialEnemy False` — it never spawns in a normal game — but it is a
+`transmogifyTarget`, a `doppelUser`, and reachable as `-human_class chicken`.
+Its death sound is a placeholder, annotated
+(`cmn/bitmaps/chicken/chicken.bitmaps:64`):
+
+```c
+  SoundNames::SEAL_DEATH,  // Need a better death sound.
+```
+
+**The Feather** (`cmn/actual.h:1117`, replacing the long-dead `Spark` class) is a
+new kind of droplet — and the reason for the whole `DropletSet` bit-flag system
+(`cmn/physical.h:68-81`). Creatures now bleed *sets* of things: the Chicken sheds
+`(DROPLET_BLOOD | DROPLET_FEATHER)`, and the Walker finally got the right answer
+(`cmn/bitmaps/walker/walker.bitmaps:78-79`):
+
+```c
+  // Walker is a cyborg, so both blood and oil, but twice the chance of oil.
+  DROPLET_OIL | DROPLET_MORE_OIL | DROPLET_BLOOD, /* dropletType */
+```
+Feathers behave nothing like blood: `dissolveTime 45`, `gravity -2` (one pixel
+every two turns), `speedModifier 0.7f`, `stickWalls False`
+(`cmn/bitmaps/feather/feather.bitmaps:43-46`). They drift down and never stick.
+
+### Two scenarios that were never played
+
+The scenario roster went from 10 to 12 (`cmn/game_style.cpp:1825`,
+`Utils::choose(12)`), with two additions to `ScenarioType`
+(`cmn/game_style.cpp:90-91`):
+
+- **The Coop** (`-scenario the-coop`, `cmn/game_style.cpp:574,3063-3099`): a 4×3
+  room world containing ten chickens on their own team, and nothing else. Clear
+  it and the arena announces **"Finger Lickin' Good"** (`:3072`).
+- **Chicken Little** (`-scenario chicken-little`, class `LookOut`,
+  `cmn/game_style.cpp:593,3103-3222`): an eight-room-wide, one-room-tall open
+  map with no maze at all, an Xit in the far corner, and **the sky falling** —
+  a rock or a weight dropped from above every three turns, up to 40 alive at
+  once. The level text is *"The sky is falling.\nFind the exit."* (`:3177`).
+  It needed a new physics rule, and Hardt wrote down why
+  (`cmn/game_style.cpp:3216-3218`, API at `cmn/physical.h:1244-1248`):
+  ```c
+  // Kind of a hack.  On this level any Heavy object in the air can hurt.
+  // So that ChopperBoys/Ninjas can't just cruise along on the top of the
+  // ceiling, only hitting the Heavies on the side and not taking damage.
+  ```
+  Rock damage was raised from 100 to **155** for it
+  (`cmn/bitmaps/rock/rock.bitmaps:50`).
+
+Chicken Little is only expressible because of a rewrite of world generation that
+landed on 24 March 2000 (`cmn/world.h` mtime `2000-03-24 05:01`): the old
+`typedef int WSpecialMap` with its four hard-coded maps (`MAP_NONE, SEALS,
+ZIG_ZAG, FLAG`) became a proper polymorphic `class SpecialMap`
+(`cmn/world.h:99-143`) with `room_maze()`, `horiz_extra_walls()`, `use_movers()`,
+`big_physicals()`, `do_doors()` — and a brand-new `EMPTY` maze mode plus
+`Blueprints::implement_edges_only()` (`cmn/world.cpp:291-319`).
+
+### The Psycho-Chicken
+
+The end-of-level bonus wheel grew from five prizes to six
+(`cmn/game.cpp:2050`, `Utils::choose(6)`). The sixth
+(`cmn/game.cpp:2129-2153`):
+
+```c
+        // Grant a psycho-chicken.
+        case 5: {
+          ...
+            // Create psychotic pet inteligence.
+            IntelOptions ops;
+            ops.psychotic = True;
+            NeutralP pet = new Pet(&world,&locator,"psycho-chicken",...);
+          ...
+          awardMsg = "Bonus: Psycho-Chicken";
+```
+Three chickens (`BONUS_CHICKENS_NUM 3`, `cmn/game.cpp:115`), yours, and insane.
+
+### The machines learned to get bored
+
+The single largest AI change since the release is a new class, `Boredom`
+(`cmn/intel.h:356-370`, `cmn/intel.cpp:937-969`). Every reflex cycle a bot's
+position is compared with the previous one; five identical cycles
+(`BOREDOM_CYCLES 5`, `cmn/intel.cpp:78`) and it is officially bored, whereupon it
+picks a random spot on the map and walks there (`cmn/intel.cpp:1005-1022`):
+
+```c
+      // Check for boredom, if bored,
+      Boolean bored = boredom.check(get_locator(),p);
+      ...
+      // Instead of just sitting there, go somewhere randomly.
+      if (strategy == doNothing) {
+```
+This is the real fix for the stuck-on-a-corner dog that Part I described being
+papered over with dice in 1999. It was never released.
+
+Worth noting for the record: the two most-quoted lines in Part I —
+*"We don't use strategyChange timer at all??  Is this right?"* and
+*"////// Does this do anything?? //////"* (`cmn/intel.cpp:2192,2220`) — **do not
+exist in the 2.02r2 release at all.** They were written in the final months.
+
+### A seventh world
+
+`W_THEME_NUM` went 6 → 7 (`cmn/coord.h:64`), with three new blocks, a background,
+an outside, and two doors (`cmn/coord.h:70-76`). Theme "MD 5"
+(`cmn/bitmaps/world/world.bitmaps:291-380`) is a dusk woodland: grassy dirt
+ledges, a vine ladder, wooden slats, a golden cobblestone exterior, a hollow-tree
+door, and a violet sky with pink clouds. It shipped enabled, with an off-switch
+in the comments (`cmn/world.cpp:2250-2253`):
+
+```c
+  // To disable the unfinished MD5 theme, subtract one here, and kill
+  // W_DOORS_TRANSPARENT.
+
+  const int ACTIVE_THEME_NUM = W_THEME_NUM;
+```
+The theme brought transparent doors with it — `#define W_DOORS_TRANSPARENT`
+(`cmn/coord.h:85`) plus a whole new mask plane on both frontends
+(`x11/xdata.h:273`, `x11/draw.cpp:91-98,109-114,387-395`, `win32/draw.cpp:290-292`).
+That code was never built with the flag off: in the archive, `x11/draw.cpp:388`
+says `#elif` where it means `#else`, so turning MD5 off would not have compiled.
+(Vella fixed it in 2011 — `ca21c5a`, "With permissive mode and only in 32 bits
+mode, the code compiles with modern GCC"; `master`'s `x11/draw.cpp:389` reads
+`#else`. It is one of the very few original-code bugs the preservation touched.)
+
+The art existed long before it was switched on: `win32/resource.h` in the *1999*
+release already defines `IDB_MD5WALL`, `IDB_MD5DOOR1`, `IDB_MD5BACKGROUND`… but
+aliased on top of the MD4 ids and the MIDI menu ids (three symbols share 1631).
+Turning the theme on meant giving them real numbers — 1709–1719 in the dev tree
+(`win32/resource.h:1081-1087`).
+
+### Balance and engine work
+
+- **Flying creatures got 50% more acceleration on UNIX** — the `#if WIN32` around
+  `acceleration * 1.5` was commented out for `Flying::act()` only
+  (`cmn/physical.cpp:8357`); `Walking` and the third locomotion still have it live.
+- **Air combat in eight directions.** Previously a creature in mid-air could only
+  head-stomp. Flyers can now attack any direction while airborne
+  (`cmn/physical.cpp:7069-7086`), free attacks time out
+  (`FIGHTER_FREE_TIME 8`, `cmn/physical.cpp:88`), and a flyer is locked out of
+  movement commands mid-swing (`cmn/physical.cpp:8402-8407`). This is the Chicken's
+  dive attack, built into the engine.
+- **Fractional gravity became a first-class engine feature**: a negative `Grav` of
+  −X now means "one unit down every X turns" (`cmn/physical.cpp:4262-4276`,
+  `cmn/physical.h:2200-2203`), replacing Flying's private hand-rolled version.
+- **Rank now scales with difficulty.** `DifficultyLevel` gained `rankMultiplier`
+  (`cmn/coord.h:637`): trivial 0.5×, normal 1.0×, hard 1.5×, bend-over 2.0×
+  (`cmn/game.cpp:359-365`), applied in `Game::choose_ranking`
+  (`cmn/game.cpp:1862-1865`). On bend-over you replace Bill as Satan's Right Hand
+  Man at 333 real kills; on trivial it takes 1332.
+- **Scenario lives cut from 10 to 7** (`cmn/game_style.cpp:72`,
+  `#define HUMAN_LIVES_SCENARIOS 7 //10`).
+- **The Alien, the Dog, the Mutt and both Huggers can use the Doppelganger now**
+  (`cmn/bitmaps/alien/alien.bitmaps:170`) — annotated
+  `True, /* doppelUser */  // Changed, why not let em use it.`
+- **Transmogifying someone no longer litters live Bombs**: `drop_all` gained a
+  `killNonPersistent` flag (`cmn/physical.h:590`), and the Transmogifier passes
+  `True` (`cmn/actual.cpp:1506-1507`).
+- **Teams became closures** (`cmn/locator.h:362-365`), so `Scenarios::dog_team`
+  generalised into `class_team` taking a `ClassId` — which is how The Coop puts
+  all chickens on one side.
+- **A machines-only game can now end properly**: if no humans were playing, the
+  arena prints *"Total Devastation: Everyone is Dead"* or *"One Machine Player
+  Survived"* (`cmn/game.cpp:1906-1917`).
+
+### Bugs he found after shipping, that nobody got
+
+- **Blood, Green Blood and Oil Droplets could not be created over the network.**
+  In the release, all three `create()` functions are `assert(0); return NULL;` —
+  and worse, GreenBlood's and OilDroplet's `PhysicalContext` both pointed at
+  `Blood::create`. All fixed in `cmn/bitmaps/{blood,green_blood,oil_droplet}/*.bitmaps`.
+- **NULL-holder crash in `Fighter::act()`** (`cmn/physical.cpp:6980`): the guard
+  `if (holder && holder->get_weapon_current())` was added because the Zombie and
+  the Chicken are Fighters with no hands.
+- **Carriers dropped items on a quiet death** (`cmn/physical.cpp:6854-6856`):
+  ```c
+      // FIXED: Don't drop persistent items if doing a quiet death.
+      // Copied this fix from User, haven't tested it too much.
+  ```
+  The corresponding `WARNING:` about the known bug was deleted from the header.
+- **The "negative damage means superficial damage" hack was removed** — which is
+  the change that broke the Altar of Sin. See below.
+
+### The dedicated server
+
+The last feature Hardt ever built. `-log_file <name>` (`cmn/game.cpp:2646`) and,
+if you run as a server, automatic daemonisation with output redirected to
+`./xevil.log` (`cmn/game.cpp:913-924`, `LOG_FNAME_DEFAULT` at `:117`). The
+implementation is `class Daemon` (`x11/xdata.h:335-357`), introduced with the
+best comment in the platform layer:
+
+```c
+// Handle the black magic to be a UNIX Daemon.
+...
+  // 1) fork new process
+  // 2) New session id
+  // 3) change working directory to /tmp
+  // 4) redirect all output from stdout and stderr to logfile
+```
+`-v` / `-version` arrived at the same time (`cmn/game.cpp:2544` and `:2804-2810`).
+
+### The protocol quietly broke
+
+Part II recorded the wire version as `XETP1.00`, held stable across the 2.x line.
+The dev tree says otherwise (`cmn/xetp_basic.cpp:36`):
+
+```c
+char *XETPBasic::versionStr = "XETP1.0X";
+```
+An "X" for experimental — and earned: `CONNECT` is `#if 0`'d out, `ACCEPT`,
+`WORLD_ROOM` and `ROOMS_KNOWN` are gone, and `TCP_CONNECT` is renumbered to 1
+(`cmn/xetp_basic.h:59-81`). This tree cannot talk to any XEvil that ever shipped.
+2.5's `XETP2.5X` is the second X, not the first.
+
+### The 148th thing your character can say
+
+The release has **147** witty sayings (A `cmn/game.h:271`); this tree has **148**
+(`cmn/game.h:271`). Diffing the arrays, exactly one line was added between January
+and August 2000, and it is the sign-off Part II singled out:
+
+> *"XEvil.  The peak of abnormality."*
+
+The 74 names of the damned are unchanged.
+
+### The mouse the UNIX version used to have
+
+A removal worth recording. The released X11 client had mouse controls — Button 1
+moved you, Button 2 fired, Button 3 changed weapon (A `x11/viewport.cpp:1589-1600`).
+In the dev tree they are fenced off (`x11/viewport.cpp:1592`):
+
+```c
+// Disable the rudimentary mouse controls, they just confuse the user.
+#if 0
+```
+An undocumented feature of the shipped UNIX game, deleted in the last months, and
+gone from every build made from this tree since.
+
+### What did *not* change
+
+`instructions/` is byte-identical between A and B — **not one word of the manual
+was updated**, so the Chicken, the Zombie, the two scenarios, the daemon and the
+new flags are undocumented everywhere. So are `readme.txt`, `compiling.html`,
+`world1.xew`, `world2.xew`, `dist.bat`, and the sound tables
+(`cmn/bitmaps/sound_cmn/sound_cmn.bitmaps` is unchanged, which is why the Chicken
+dies with a baby seal's voice).
+
+## The Altar's wrath, dated
+
+Part II described the Altar of Sin's second face: attack it and you are turned
+into a frog or a baby seal, or drained to zero, while the arena flashes
+*"Don't FUCK with the Altar of Sin."* We can now date the day that stopped
+working, and it is not a 1994 bug — it is **20 June 2000**.
+
+In the 2.02r2 release the base virtual is two parameters
+(A `cmn/physical.h:494`):
+
+```c
+  virtual Boolean corporeal_attack(PhysicalP killer,int damage);
+```
+and every override in `actual.h` matches it. The mechanic worked.
+
+On 20 June 2000 (`cmn/physical.h` mtime `2000-06-20 12:05`) Hardt removed the
+"negative damage means superficial damage" hack — `cmn/physical.cpp:499`,
+`// Got rid of hack of using negative numbers for superficial damage.` — and gave
+the virtual a third parameter (`cmn/physical.h:513-514`):
+
+```c
+  virtual Boolean Physical::corporeal_attack(PhysicalP,int damage,
+           AttackFlags flags = ATT_DAMAGE | ATT_DROPLETS);
+```
+He updated the two overrides that live in `physical.h` (`:855` Moving, `:2078`
+Creature). He never opened `actual.h` again — its mtime is `2000-04-29 23:29`,
+**seven weeks older than the header it derives from.** In 2000-era C++ there was
+no `override` keyword and no warning: the four two-parameter declarations simply
+stopped overriding anything and became dead name-hiding shadows.
+
+There are exactly four, and this is the complete list (verified by extracting
+every `virtual` declaration in `cmn/*.h` and grouping by arity — `corporeal_attack`
+is the only function in the engine with a split):
+
+| `actual.h` | class | what it did | what it does now |
+|---|---|---|---|
+| 68 | `PhysMover` | `return False` — the invisible mover proxy is unattackable | nothing (health 0, so harmless) |
+| 158 | `Fire` | `return False` — fire cannot be shot out | nothing (health 0, so harmless) |
+| 196 | `FireExplosion` | `return False` | nothing (health 0, so harmless) |
+| **390** | **`AltarOfSin`** | **the entire frog/baby-seal curse and the BLASPHMER drain** | **never runs** |
+
+Three are duds. The fourth is the mechanic. `AltarOfSin::corporeal_attack`
+(`cmn/actual.cpp:1006-1076`) is **byte-identical** in A and in this tree — 71
+lines of morph-into-a-frog, `"BLASPHMER!  "`, arena message — and since 20 June
+2000 nothing has called it. Two consequences, both live in the repo today:
+
+1. Attacking the Altar has no effect on you at all.
+2. The Altar became **destructible**. The old override never called up the tree,
+   so the altar took zero damage and was indestructible; the base implementation
+   now applies damage to its 2000 hit points
+   (`cmn/bitmaps/altar_of_sin/altar_of_sin.bitmaps:87`). You can shoot it dead.
+
+The irony is exact: the *source release* everyone could download preserves a
+working Altar; the *game* everyone actually played, built after 20 June 2000,
+does not.
+
+## `world.bitmaps~` — one file caught mid-edit
+
+The single stray artifact in either archive is an editor backup:
+`cmn/bitmaps/world/world.bitmaps~`, dated **20 March 2000**, sitting next to a
+live file dated **22 July 2000, 23:44** — the last thing touched in the entire
+art tree. The diff between them is the whole answer:
+
+```diff
++#include "gen_xpm/world/block_22.xpm"
++#include "gen_xpm/world/block_23.xpm"
++#include "gen_xpm/world/block_24.xpm"
++#include "gen_xpm/world/background_14.xpm"
++#include "gen_xpm/world/outside_6.xpm"
++#include "gen_xpm/world/door_10.xpm"
++#include "gen_xpm/world/door_11.xpm"
+```
+Seven lines. At a quarter to midnight on 22 July 2000, Steve Hardt was wiring the
+seventh world into the UNIX build, one `#include` at a time, and his editor
+snapshotted the file as it had stood four months earlier. It is the most precisely
+dated moment in the whole excavation, and it survived into git because nobody ever
+ran a cleanup.
+
+## The last all-nighter
+
+The mtimes of the eight most recently modified files in the archive tell one story:
+
+```
+2000-08-20 18:56  win32/xdata.h
+2000-08-20 19:23  makefile
+2000-08-20 20:37  cmn/game.h
+2000-08-20 20:42  x11/xdata.h
+2000-08-20 20:51  x11/xdata.cpp
+2000-08-20 21:01  cmn/game.cpp
+2000-08-21 06:59  x11/viewport.cpp
+2000-08-21 07:00  x11/ui.cpp
+```
+Twelve hours, ending at seven in the morning. It is the dedicated-server work —
+and you can watch him change his mind inside it. At 18:56 he wrote the Windows
+half first, as a class called `LogFile` (`win32/xdata.h:438-449`):
+
+```c
+// All dummy on Windows.
+class LogFile {
+public:
+  LogFile() {}
+  ~LogFile() {}
+  void set_file_name(const char*) {}
+  void enable();
+  void disable();
+};
+```
+Two hours later the UNIX side appeared under a different name, `Daemon`, with a
+different shape. `LogFile` was never mentioned again. `enable()` and `disable()`
+are declared and defined nowhere; nothing in the tree constructs one. It is still
+sitting in this repository at `win32/xdata.h:439`, twenty-six years later — the
+last unfinished thought in XEvil.
+
+It left the Windows build broken, too. `cmn/game.h:506-508` declares the member
+with no platform guard —
+
+```c
+  // For logging server output to a file.
+  // UNIX-only for now.
+  Daemon* daemon;
+```
+— and `class Daemon` exists only in `x11/xdata.h`. The October 2000 snapshot
+compiles on UNIX and cannot compile on Windows. That is why it was a developer
+zip and not a release.
+
+After 07:00 on 21 August 2000, nothing in this tree was ever edited again. Two
+months later, on 22 October, Steve Hardt zipped it up and put it on the FTP site.
+Then he stopped.
+
+## The Death March has a name
+
+Part I called `IDM_DEATHMARCHSOUNDTRACK 1631` "the only trace of a tenth music
+track" and Part II buried it as gone before the tape starts. Both were one file
+short. The Visual C++ project has never been cleaned
+(`win32/xevil.dsp:859`, present identically in A, in B, and in this repo):
+
+```
+SOURCE=.\res\dethmrch.mid
+```
+Ten `.mid` entries in the project; nine files on disk. **The lost track was called
+`DETHMRCH.MID`**, it lived in `win32/res/` alongside the others, and it was
+deleted from the folder without being removed from the project. There are still no
+bytes to recover — but there is now an exact 8.3 filename to hunt for in any
+surviving 1.x/2.0-beta build or backup, which is more than we had.
+
+## Human traces
+
+Things Steve Hardt wrote to himself in the last months, none of which appear in
+the released source:
+
+- `cmn/world.cpp:2372` — after nine lines of infinite-loop guard, the entire
+  justification for the fallback path: **`// Fuck it.`**
+- `cmn/utils.cpp:47` — **`// We will get warnings from doing this, but fuck it.
+  At least it compiles.`**
+- `cmn/physical.cpp:9418` — **`// Sucks ass, not extendable.`**, written over the
+  new `AnimTime` class-lookup switch: a companion piece to the pre-existing
+  *"Not very extendable.  This sucks, Beavis."* over the Fighter one (`:7499`)
+- `cmn/game.cpp:1196-1197` — on his own architecture: *"Sure would be nice to move
+  the above code somehow into Role.  Game really shouldn't have to do
+  role->get_type().  **Bad OO programming.**"*
+- `cmn/role.cpp:2800`, in the server's blocking connect loop:
+  **`// Really should have a timeout here.`**
+- `cmn/role.cpp:939` — **`//// Why do we need this.  Don't we already do it in
+  Client::~Client??`** (the `////` prefix is his tell for arguing with himself)
+- `cmn/physical.h:79-81` — **`// WARNING: If you add another droplet type, also
+  add it to Droplet::choose_droplet_class().  Yeah, I know, should be a better
+  way.`**
+- `cmn/game_style.cpp:1775`, above the `-scenario` string comparisons:
+  **`// Ick, not extensible.`**
+- `cmn/physical.h:2200-2203` — a feature idea, in writing, that never happened:
+  *"Will need to implement some other way of representing fractional gravity if we
+  want to create **"upside-down world"** or something like that."*
+- `cmn/bitmaps/zombie/zombie.bitmaps:258` — **`// Moved body slam down one, so
+  doesn't go above people.`**
+And one that is older than the rest but too good to leave out: `cmn/game.cpp:3456`
+carries an edit its author signed in the code, **`// moved after the
+Locator::add(), hardts`** — his MIT Athena username, the same one that appears in
+`Game::intelNames` so you can frag him. It is in the release too, worded *"moved
+to after the Locator::add()"*; in the last months he went back and deleted the
+stray "to".
+
+And two quieter ones.
+
+`classes.txt` — the hand-drawn ASCII class hierarchy — was updated on 3 April 2000
+to add `Feather`, `Zombie` and `Chicken` (and to note that Chicken is both
+`Flying` and a `Fighter`). In the same pass he fixed two lines of indentation that
+had been wrong since 1999: `(Yeti)` under `Prickly` and `(Alien)` under `Healing`
+(`classes.txt:169` and `:172`). Nobody would ever have noticed.
+
+And the licence headers. In the 2.02r2 release exactly one file still carried the
+pre-GPL, shareware-era notice — *"obtain a copy from http://www.xevil.com/docs/
+license.txt"* — and it was `hugger.bitmaps`. He caught it and replaced it with the
+full GPL block. But the two files he created in February 2000 were copied from a
+stale template, so today the *only* two files in the whole of XEvil still bearing
+the pre-GPL header are the Chicken and its feathers:
+
+```
+cmn/bitmaps/chicken/chicken.bitmaps
+cmn/bitmaps/feather/feather.bitmaps
+```
+
+### Loose threads he left behind
+
+Half-finished work still sitting in this repo, for anyone who wants it:
+`Locator::team_member()` is written, complete, and fenced off in `#if 0`
+(`cmn/locator.cpp:1386-1411`) — and references a `member` field that does not
+exist. `Utils::ceil` and `Utils::floor` were added (`cmn/utils.h:261-265`), are
+called by nothing, and are both wrong (`ceil` rounds half-up; `floor` truncates
+toward zero). `DEFINE_CREATURE_CTORS_1` was defined and never used
+(`cmn/actual.cpp:130-138`). `attack_free_horizontal()` is a one-line shim left
+behind by a rename (`cmn/physical.h:2801`). And `class Pulser` was written as the
+general answer to fractional timing, then used only by droplets while the new
+gravity code reimplemented it by hand.
