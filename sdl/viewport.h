@@ -124,7 +124,10 @@ public:
   void set_humans_playing(int n) {humansPlayingNum = n;}
   void set_enemies_playing(int n) {enemiesPlayingNum = n;}
   void set_pause_message(Boolean on) {pauseMessage = on;}
-  void set_prompt_difficulty(Boolean on) {promptDifficulty = on; redrawArena = True;}
+  void set_prompt_difficulty(Boolean on,int dflt = DIFF_NONE)
+    {promptDifficulty = on; promptDefault = dflt; redrawArena = True;}
+  /* EFFECTS: Show/hide the "Enter level of difficulty" prompt.  `dflt` is the
+     level to highlight as the current choice (DIFF_NONE == none yet). */
 
   // ---- Menu-bar value setters (Game drives these through the Ui) ----
   void set_style_and_role_type(GameStyleType,RoleType);
@@ -171,6 +174,7 @@ private:
   RoleType roleType;
   const DifficultyLevel *difficultyLevels;
   Boolean promptDifficulty;
+  int promptDefault;     // level the prompt highlights (DIFF_NONE == none)
 
   // Input plumbing (reused cmn dispatcher).
   KeyState keyState;

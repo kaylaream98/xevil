@@ -5997,12 +5997,58 @@ void User::set_mapped_next(Boolean val) {
 // NOTE: This does not check if the Item persists.  E.g. Bombs will
 // be dropped.
 void User::drop_all(Boolean killNonPersistent) {
-  // Damn, this is easy.
+  // Used to be a bare "while (weaponsNum > 0) weapon_drop();", which is only
+  // correct while every held weapon is reachable by the selection arithmetic.
+  // It isn't always:  weapon_drop() is a no-op whenever nothing is selected
+  // (weaponCurrent == weaponsNum) and weapon_change() fails to select
+  // anything, and weapon_change() fails whenever no held weapon is STRICTLY
+  // cooler than the BuiltIn (coolest_weapon) and none is STRICTLY less cool
+  // than it (next_coolest_weapon) -- i.e. a weapon whose coolness exactly
+  // equals the wielder's BuiltIn coolness is in a permanent blind spot.  A
+  // slot whose Id the Locator no longer resolves stalls the same way.  Either
+  // case spun this loop forever; that is the hazard the old "BUG, can get
+  // into an infinite loop here from User::drop_all" note in weapon_drop()
+  // warned about.  Give the loop a forward-progress guarantee instead.
   while (weaponsNum > 0) {
+    int before = weaponsNum;
+    int beforeCurrent = weaponCurrent;
     weapon_drop(killNonPersistent);
+    // Dropping nothing is fine as long as the selection moved -- that is the
+    // ordinary "nothing was selected, so weapon_change() picked something"
+    // iteration and the next pass will drop what it picked, exactly as
+    // before.  Only a turn that changes NEITHER is a fixed point.
+    if (weaponsNum == before && weaponCurrent == beforeCurrent) {
+      // Force a slot that definitely exists and drop that.
+      weaponCurrent = weaponsNum - 1;
+      weapon_drop(killNonPersistent);
+      if (weaponsNum == before) {
+        // Still nothing.  weapon_drop() resolves reserved entries as well as
+        // valid ones, so an Id that fails there belongs to an object the
+        // Locator has already deleted -- there is nothing left to drop and
+        // nothing to leak.  Forget the slot.
+        weaponsNum--;
+        weaponCurrent = weaponsNum;
+      }
+    }
   }
+
+  // Same reasoning for items:  coolest_item() needs coolness > 0 and
+  // next_coolest_item() coolness < 0, so an item of coolness exactly 0 -- or
+  // one whose Id no longer resolves -- would never be selected and never be
+  // dropped.
   while (itemsNum > 0) {
+    int before = itemsNum;
+    int beforeCurrent = itemCurrent;
     item_drop(killNonPersistent);
+    if (itemsNum == before && itemCurrent == beforeCurrent) {
+      itemCurrent = itemsNum - 1;
+      item_drop(killNonPersistent);
+      if (itemsNum == before) {
+        // Dead Id; nothing to drop.  See the weapon loop above.
+        itemsNum--;
+        itemCurrent = itemsNum;
+      }
+    }
   }
 }
 
@@ -6544,7 +6590,14 @@ void User::weapon_drop(Boolean killNonPersistent) {
     // Clean up dead weapons elsewhere.
 
     PhysicalP weapon;
-    if (weapon = locator->lookup(weapons[weaponCurrent])) {
+    // Resolve recent additions too (the True).  A Locator entry that is only
+    // *reserved* belongs to an object created earlier this turn -- alive, and
+    // if it is in weapons[] then held.  Locator::del_now() clears both valid
+    // and reserved, so this can still never resurrect a dead Id; all it does
+    // is stop a just-acquired weapon from being undroppable for one turn.
+    // Without it User::drop_all() has to abandon the slot, which would leave
+    // that object alive, held and unmapped -- invisible and un-pickable.
+    if (weapon = locator->lookup(weapons[weaponCurrent],True)) {
 	    ((WeaponP)weapon)->leave_scope_next(cre);
 
       // kill off non-persistent objects, like Bomb.
@@ -6569,7 +6622,8 @@ void User::weapon_drop(Boolean killNonPersistent) {
 	      ((WeaponP)weapon)->enter_scope_next(cre);
       }
     }
-    // BUG, can get into an infinite loop here from User::drop_all
+    // If the lookup failed this call did nothing; User::drop_all() used to
+    // spin forever on that.  It now detects the lack of progress itself.
   }
   else { // No current weapon.
     /* Cycle to next available weapon, so can keep dropping. */
@@ -6623,7 +6677,8 @@ void User::item_drop(Boolean killNonPersistent) {
     // Clean up dead items elsewhere.
 
     PhysicalP item;
-    if (item = locator->lookup(items[itemCurrent])) {
+    // Resolve recent additions too; see the note in User::weapon_drop().
+    if (item = locator->lookup(items[itemCurrent],True)) {
 
       // kill off non-persistent objects, like Bomb.
       if (killNonPersistent && !((ItemP)item)->persists()) {      

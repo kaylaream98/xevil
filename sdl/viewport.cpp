@@ -23,6 +23,7 @@
 #include "locator.h"
 #include "physical.h"
 #include "intel.h"
+#include "role.h"      // Role::uses_*(), for the menu-bar greying rules.
 #include "viewport.h"
 
 using namespace std;
@@ -122,6 +123,7 @@ Viewport::Viewport(Xvars &xv,int dpy,WorldP w,LocatorP l,int sc,
   roleType = rType;
   difficultyLevels = dLevels;
   promptDifficulty = False;
+  promptDefault = DIFF_NONE;
   uiClosure = uiClos;
   focusPanel = NULL;
   arenaMessage = NULL;
@@ -564,6 +566,7 @@ void Viewport::reset() {
   arenaMessage = NULL;
   pauseMessage = False;
   promptDifficulty = False;
+  promptDefault = DIFF_NONE;
   redrawArena = True;
   focusPanel = NULL;
   if (messageBar) {
@@ -594,6 +597,39 @@ void Viewport::set_style_and_role_type(GameStyleType style,RoleType rType) {
   ((TogglePanel *)menus[menuTraining])->set_value(style == TRAINING);
   ((TogglePanel *)menus[menuSurvival])->set_value(style == SURVIVAL);
   ((TogglePanel *)menus[menuBossRush])->set_value(style == BOSS_RUSH);
+
+  // Grey out the widgets this style/role combination ignores.  Same rules, in
+  // the same order, as x11/viewport.cpp's set_style_and_role_type() -- the two
+  // menu bars are supposed to be indistinguishable, and TextPanel already
+  // knows how to draw itself stippled and to swallow clicks when insensitive
+  // (sdl/panel.cpp), it was just never told to.
+
+  // EnemiesNum
+  menus[menuEnemiesNum]->
+    set_sensitive(Role::uses_enemies_num(roleType) &&
+                  GameStyle::uses_enemies_num(style));
+
+  // EnemiesRefill
+  menus[menuEnemiesRefill]->
+    set_sensitive(Role::uses_enemies_refill(roleType) &&
+                  GameStyle::uses_enemies_refill(style));
+
+  // GameStyle
+  Boolean enabled = Role::uses_game_style(roleType);
+  menus[menuLevels]->set_sensitive(enabled);
+  menus[menuScenarios]->set_sensitive(enabled);
+  menus[menuKill]->set_sensitive(enabled);
+  menus[menuDuel]->set_sensitive(enabled);
+  menus[menuExtended]->set_sensitive(enabled);
+  menus[menuTraining]->set_sensitive(enabled);
+  menus[menuSurvival]->set_sensitive(enabled);
+  menus[menuBossRush]->set_sensitive(enabled);
+
+  // HumansNum
+  menus[menuHumansNum]->set_sensitive(Role::uses_humans_num(roleType));
+
+  // Cooperative
+  menus[menuCooperative]->set_sensitive(Role::uses_cooperative(roleType));
 }
 
 
@@ -791,7 +827,13 @@ void Viewport::draw_difficulty_prompt() {
   xvars.set_draw_color(xvars.black[dpyNum]);
   SDL_RenderFillRect(xvars.renderer,&dst);
 
+  // The level [space]/[enter] takes: the player's remembered choice, or the
+  // classic "normal" the first time around.
+  int dflt = (promptDefault >= 0 && promptDefault < DIFFICULTY_LEVELS_NUM)
+             ? promptDefault : DIFF_NORMAL;
+
   Pixel red = xvars.red[dpyNum];
+  Pixel white = xvars.white[dpyNum];
   int lineH = f->cellH * scale;
   int x = arenaPos.x + f->cellW * scale;
   int y = arenaPos.y + lineH;
@@ -803,15 +845,27 @@ void Viewport::draw_difficulty_prompt() {
 
   for (int n = 0; n < DIFFICULTY_LEVELS_NUM; n++) {
     char buf[128];
-    if (n == DIFF_NORMAL) {
-      snprintf(buf,sizeof(buf),"[%d,space]  %s",n,difficultyLevels[n].name);
-    } else {
-      snprintf(buf,sizeof(buf),"[%d]        %s",n,difficultyLevels[n].name);
-    }
+    snprintf(buf,sizeof(buf),"%s [%d]  %s",
+             (n == dflt) ? "->" : "  ",n,difficultyLevels[n].name);
     y += lineH;
+    if (n == dflt) {
+      // Highlight bar behind the current choice: white on dark red.
+      SDL_Rect bar = {x - f->cellW * scale / 2,y,
+                      (int)(strlen(buf) + 1) * f->cellW * scale,lineH};
+      xvars.set_draw_color(Pixel_rgb(96,0,0));
+      SDL_RenderFillRect(xvars.renderer,&bar);
+    }
+    Pixel c = (n == dflt) ? white : red;
     font::draw_scaled(xvars.renderer,*f,x,y + f->ascent * scale,buf,
-                      Pixel_r(red),Pixel_g(red),Pixel_b(red),255,scale);
+                      Pixel_r(c),Pixel_g(c),Pixel_b(c),255,scale);
   }
+
+  y += 2 * lineH;
+  char foot[160];
+  snprintf(foot,sizeof(foot),"[space] or [enter] keeps %s",
+           difficultyLevels[dflt].name);
+  font::draw_scaled(xvars.renderer,*f,x,y + f->ascent * scale,foot,
+                    Pixel_r(red),Pixel_g(red),Pixel_b(red),255,scale);
 }
 
 

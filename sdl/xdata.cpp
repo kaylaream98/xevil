@@ -196,7 +196,7 @@ void Xvars::position_window(int d,int x,int y) {
 
 
 
-void Xvars::set_fullscreen(int d,Boolean on,const Size &logical) {
+void Xvars::set_fullscreen(int d,Boolean on,const Size &logical,Boolean fill) {
   if (d < 0 || d >= dpyMax || !windows[d]) {
     return;
   }
@@ -204,6 +204,9 @@ void Xvars::set_fullscreen(int d,Boolean on,const Size &logical) {
     // The letterbox: SDL scales the native-size logical content up to the
     // window with black bars, so every pixel-coordinate draw is unchanged.
     SDL_RenderSetLogicalSize(renderers[d],logical.width,logical.height);
+    // "crisp" clamps that scale to a whole number (no half-height pixel rows);
+    // "fill" lets it be fractional so the game reaches the screen edge.
+    SDL_RenderSetIntegerScale(renderers[d],fill ? SDL_FALSE : SDL_TRUE);
     // Belt-and-suspenders so it also covers the screen on a bare X server with
     // no window manager (headless Xvfb): make the window borderless and the
     // size of the desktop before asking SDL for desktop-fullscreen.
@@ -217,6 +220,7 @@ void Xvars::set_fullscreen(int d,Boolean on,const Size &logical) {
     SDL_SetWindowFullscreen(windows[d],SDL_WINDOW_FULLSCREEN_DESKTOP);
   } else {
     SDL_SetWindowFullscreen(windows[d],0);
+    SDL_RenderSetIntegerScale(renderers[d],SDL_FALSE);
     SDL_RenderSetLogicalSize(renderers[d],0,0);
     SDL_SetWindowBordered(windows[d],SDL_TRUE);
     SDL_SetWindowSize(windows[d],logical.width,logical.height);

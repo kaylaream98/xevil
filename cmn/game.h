@@ -511,6 +511,11 @@ private:
 
   int difficulty; // Should never be DIFF_NONE.
   int difficultyNext; // DIFF_NONE means not specified yet.
+  /* True when the difficulty was pinned for this whole run (-difficulty on the
+     command line, or a frontend with its own difficulty UI).  Otherwise every
+     New Game re-asks, offering difficultyNext -- the value remembered in
+     ~/.xevilrc -- as the highlighted default. */
+  Boolean difficultyForced;
 
   RoleP role; // client/server/standalone
 

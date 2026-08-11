@@ -139,18 +139,28 @@ windows:
 ## sufficient -- the zip is a courtesy wrapper (quickstart + GPL/source notice).
 ## The archive is built with `python3 -m zipfile` (python3 is already a build
 ## dependency via gen_audio.py), so no `zip` binary is required.
+##
+## The dist copy is STRIPPED; sdl/BUILD-WIN/xevil.exe keeps its symbols so the
+## build tree stays debuggable.  Stripping is not cosmetic here: the debug and
+## symbol sections are ~12.4 MiB of the 46.2 MiB exe and they compress poorly,
+## so they cost ~3.4 MiB in the zip -- the difference between a 32.9 MiB and a
+## 29.4 MiB download.
 DIST_DIR = $(DEPTH)/dist
 WIN_EXE  = $(DEPTH)/sdl/BUILD-WIN/xevil.exe
+WIN_STRIP = x86_64-w64-mingw32-strip
 
 .PHONY: dist-windows
 dist-windows: windows
 	@mkdir -p $(DIST_DIR)
 	cp $(WIN_EXE) $(DIST_DIR)/xevil.exe
+	$(WIN_STRIP) $(DIST_DIR)/xevil.exe
 	@rm -f $(DIST_DIR)/XEvil-2.5-win64.zip
 	cd $(DIST_DIR) && python3 -m zipfile -c XEvil-2.5-win64.zip \
 		xevil.exe README-WINDOWS.txt
 	@echo "dist-windows: wrote $(DIST_DIR)/XEvil-2.5-win64.zip"
-	@echo "              and the bare $(DIST_DIR)/xevil.exe"
+	@echo "              and the bare (stripped) $(DIST_DIR)/xevil.exe"
+	@python3 -c "import os; f='$(DIST_DIR)/XEvil-2.5-win64.zip'; \
+	 s=os.path.getsize(f); print('              %.3f MiB'%(s/1048576.0))"
 
 #.SUFFIXES: .C .o
 #.C.o: $*.C

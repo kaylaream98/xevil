@@ -931,6 +931,7 @@ Viewport::Viewport(int arg_c,char** arg_v,
   arenaMessage = NULL;
   redrawArena = True;
   promptDifficulty = False;
+  promptDefault = DIFF_NONE;
 
   // Zero unless this turns out to be the fullscreen primary viewport, set in
   // create_toplevel().
@@ -1299,9 +1300,20 @@ void Viewport::unclear_all() {
 
 
 
-void Viewport::set_prompt_difficulty(Boolean val) {
+void Viewport::set_prompt_difficulty(Boolean val,int dflt) {
   promptDifficulty = val;
+  promptDefault = dflt;
   redrawArena = True;
+}
+
+
+
+int Viewport::prompt_default() {
+  // Always a real level: nothing chosen yet means the classic "normal".
+  if (promptDefault >= 0 && promptDefault < DIFFICULTY_LEVELS_NUM) {
+    return promptDefault;
+  }
+  return DIFF_NORMAL;
 }
 
 
@@ -1352,6 +1364,7 @@ void Viewport::reset() {
   intel = NULL;
   redrawArena = True;
   promptDifficulty = False;
+  promptDefault = DIFF_NONE;
   Utils::freeif(arenaMessage);  // Actual message being displayed.
   for (int m = 0; m < VW_STATUSES_NUM; m++) {
     statuses[m]->set_message("");
@@ -1592,9 +1605,14 @@ void Viewport::key_press(XEvent *event) {
       diffCallback->change_difficulty(3);
     }
     
-    if (event->xkey.keycode == 
-        XKeysymToKeycode(xvars.dpy[dpyNum],XK_space)) {
-      diffCallback->change_difficulty(DIFF_NORMAL);
+    // Space / Return take the highlighted default (your last choice).
+    if (event->xkey.keycode ==
+          XKeysymToKeycode(xvars.dpy[dpyNum],XK_space) ||
+        event->xkey.keycode ==
+          XKeysymToKeycode(xvars.dpy[dpyNum],XK_Return) ||
+        event->xkey.keycode ==
+          XKeysymToKeycode(xvars.dpy[dpyNum],XK_KP_Enter)) {
+      diffCallback->change_difficulty(prompt_default());
     }
     return;
   }
@@ -1624,7 +1642,7 @@ void Viewport::receive_key(int key,Boolean down) {
 
 void Viewport::button_press(XEvent *event) {
   if (promptDifficulty) {
-    diffCallback->change_difficulty(DIFF_NORMAL);
+    diffCallback->change_difficulty(prompt_default());
     return;
   }
 
@@ -1741,25 +1759,46 @@ void Viewport::draw() {
       XSetForeground(xvars.dpy[dpyNum],xvars.gc[dpyNum],
                      xvars.red[dpyNum]);
       
+      // The level [space]/[Return] takes: the choice remembered in
+      // ~/.xevilrc, or the classic "normal" the first time around.
+      int dflt = prompt_default();
+
       Pos pos(xvars.fontSize[dpyNum].width,xvars.fontSize[dpyNum].height);
       draw_string(pos,"Enter level of difficulty:");
       pos.y += xvars.fontSize[dpyNum].height;
-      
+
       for (int n = 0; n < DIFFICULTY_LEVELS_NUM; n++) {
         ostrstream str;
-        str << "[" << n;
-        if (n == DIFF_NORMAL) {
-          str << ",space]  ";
+        str << ((n == dflt) ? "-> [" : "   [") << n << "]  "
+            << difficultyLevels[n].name << ends;
+        pos.y += xvars.fontSize[dpyNum].height;
+        if (n == dflt) {
+          // The current choice, in the menu bar's own highlight idiom: white
+          // on a filled black bar.
+          XSetForeground(xvars.dpy[dpyNum],xvars.gc[dpyNum],
+                         xvars.black[dpyNum]);
+          XFillRectangle(xvars.dpy[dpyNum],arena,xvars.gc[dpyNum],
+                         pos.x - xvars.fontSize[dpyNum].width / 2,pos.y,
+                         (strlen(str.str()) + 1) * xvars.fontSize[dpyNum].width,
+                         xvars.fontSize[dpyNum].height);
+          XSetForeground(xvars.dpy[dpyNum],xvars.gc[dpyNum],
+                         xvars.white[dpyNum]);
         }
         else {
-          str << "]        ";
+          XSetForeground(xvars.dpy[dpyNum],xvars.gc[dpyNum],xvars.red[dpyNum]);
         }
-        str << difficultyLevels[n].name << ends;
-        pos.y += xvars.fontSize[dpyNum].height;
         draw_string(pos,str.str());
         delete str.str();
       }
-      
+
+      XSetForeground(xvars.dpy[dpyNum],xvars.gc[dpyNum],xvars.red[dpyNum]);
+      ostrstream foot;
+      foot << "[space] or [Return] keeps " << difficultyLevels[dflt].name
+           << ends;
+      pos.y += 2 * xvars.fontSize[dpyNum].height;
+      draw_string(pos,foot.str());
+      delete foot.str();
+
       XSetForeground(xvars.dpy[dpyNum],xvars.gc[dpyNum],
                      xvars.black[dpyNum]);
     }

@@ -295,7 +295,7 @@ Boolean PhysMover::collidable() {
 
 
 
-Boolean PhysMover::corporeal_attack(PhysicalP,int) 
+Boolean PhysMover::corporeal_attack(PhysicalP,int,AttackFlags) 
 {
   return False;
 }
@@ -591,6 +591,10 @@ void Fire::collide(PhysicalP other) {
 
 
 
+// NOTE: Still the 2-parameter form, so this does not override
+// Physical::corporeal_attack() and never runs.  That is deliberate; see the
+// declaration in actual.h for why Fire is the one of the four 20-June-2000
+// casualties that was left alone.
 Boolean Fire::corporeal_attack(PhysicalP,int) {
   return False;
 }
@@ -686,7 +690,7 @@ Boolean FireExplosion::collidable() {
 
 
 
-Boolean FireExplosion::corporeal_attack(PhysicalP,int) {
+Boolean FireExplosion::corporeal_attack(PhysicalP,int,AttackFlags) {
   return False;
 }
   
@@ -1012,9 +1016,23 @@ DEFINE_CREATE_FROM_STREAM(AltarOfSin)
 
 
 
-Boolean AltarOfSin::corporeal_attack(PhysicalP other,int) {
+Boolean AltarOfSin::corporeal_attack(PhysicalP other,int,AttackFlags) {
   /* Don't fuck with the Altar of Sin. */
-  
+
+  /* The body below is Steve Hardt's, unchanged; only the signature grew the
+     AttackFlags parameter it needs in order to be an override again.  Both the
+     damage and the flags are ignored on purpose -- the Altar never calls up
+     the tree, which is exactly what makes it indestructible.
+
+     Note who `other` is.  Every caller passes the *attacker*, not the thing
+     that touched the Altar: Fighter::attack() passes the Creature, and
+     Shot::collide() passes locator->lookup(shooter).  So shooting the Altar
+     punishes the shooter, and a shot whose shooter is already gone arrives
+     here as NULL and is caught by the `other &&` below.  Anything without an
+     Intel -- a thrown rock, an Explosion with a dead bomber -- simply gets no
+     reaction, and still does no damage. */
+
+
   if (turnTaken) {
     return False;
   }
@@ -2149,6 +2167,15 @@ void Mine::act() {
     armTimer.clock();
     if (armTimer.ready()) {
       armed = True;
+      // The grace period is over and the mine is live: a small double click so
+      // anyone still standing over it gets one warning.  This is the only place
+      // MINE_ARM fires -- Mine::use() plants quietly and Item::use()'s
+      // useSound path is deliberately not chained to.
+      SoundRequest req(SoundNames::MINE_ARM,get_area());
+      get_locator()->submitSoundRequest(req);
+      if (getenv("XEVIL_ITEM_DEBUG")) {
+        cerr << "XEVIL-ITEM: mine arms" << endl;
+      }
     }
   }
 
@@ -2878,12 +2905,14 @@ Stats Star::stats;
 Rail::Rail(WorldP w,LocatorP l,const Pos &p,const Id &shooter,Dir d)
 : Shot(context,xdata,w,l,p,shooter,d,d)
 {
+  hitsNum = 0;
   stats.add_creation();
 }
 
 
 
 CONSTRUCTOR_LEAF_IO(Rail,Shot) {
+  hitsNum = 0;
 }
 
 
@@ -2908,10 +2937,193 @@ void Rail::collide(PhysicalP other)
 
   // Damage whatever we hit, but do NOT kill_self() -- the Rail pierces and
   // keeps flying.  Shot::act() still kills it when it hits a wall.
+  //
+  // This is the engine's own stop-by-stop collision phase, which tests the
+  // position the Rail is sitting at right now.  sweep() has already tested
+  // everything between here and the previous stop, so the note_hit() list is
+  // what stops a victim the sweep found from being damaged a second time when
+  // the Rail ends its turn still overlapping it.
+  if (!note_hit(other->get_id())) {
+    return;
+  }
+
   LocatorP locator = get_locator();
   PhysicalP p = locator->lookup(get_shooter());
   // p may be NULL.
   other->corporeal_attack(p,get_damage());
+}
+
+
+
+Boolean Rail::note_hit(const Id &id)
+{
+  for (int n = 0; n < hitsNum; n++) {
+    if (hits[n] == id) {
+      return False;
+    }
+  }
+
+  if (hitsNum >= HITS_MAX) {
+    return False;
+  }
+
+  hits[hitsNum++] = id;
+  return True;
+}
+
+
+
+Boolean Rail::sweep_can_hit(PhysicalP other)
+{
+  // Same order as the filter in Locator::collision_checks().  The clauses that
+  // are dropped are the ones a Rail cannot fail: it is not a Composite, and it
+  // never has an Intel, so the composite-vs-composite and intel dont_collide
+  // tests are vacuous for it.
+  if (other == this || other->is_shot()) {
+    return False;
+  }
+
+  if (!other->alive() ||        // So corpses don't collide.
+      !other->get_mapped() ||
+      !other->collidable()) {
+    return False;
+  }
+
+  // Shooter immunity.  Gun::_fire() sets dont_collide to the shooter's Id.
+  if (get_dont_collide() == other->get_id() ||
+      other->get_dont_collide() == get_id()) {
+    return False;
+  }
+
+  // ...and to the shooter's whole Composite, if it is part of one.
+  CompositeP c = other->get_composite();
+  if (c && c->get_composite_id() == get_dont_collide_composite()) {
+    return False;
+  }
+
+  // Teammates don't collide.  The engine consults the matched team's
+  // membersDontCollide option; the only team rule that can ever return True
+  // with a Shot as one of its arguments is Game::universal_team (the dragon
+  // scenario), because every other rule needs an Intel on both sides or the
+  // same ClassId on both sides.  universal_team is registered with default
+  // TeamOptions, i.e. membersDontCollide True -- so for a Rail "same team"
+  // and "must not collide" are the same question, and the public one-line
+  // form of same_team() answers it.
+  LocatorP locator = get_locator();
+  if (locator->same_team(this,other)) {
+    return False;
+  }
+
+  return True;
+}
+
+
+
+void Rail::sweep()
+{
+  Pos startPos;
+  Size size;
+  Area startArea = get_area();
+  startArea.get_rect(startPos,size);
+
+  Pos endPos;
+  Size endSize;
+  get_area_next().get_rect(endPos,endSize);
+
+  Size delta = endPos - startPos;
+  if (delta.width == 0 && delta.height == 0) {
+    return;
+  }
+
+  // Sub-step short enough that consecutive swept boxes touch on both axes:
+  // stride <= the beam's own extent on that axis means no gap can open.  The
+  // beam is 30x1 lying down and 1x30 standing up, so it is the 1px axis that
+  // sets the count whenever the Rail is travelling diagonally.
+  int dx = delta.width  < 0 ? -delta.width  : delta.width;
+  int dy = delta.height < 0 ? -delta.height : delta.height;
+  int steps = 1;
+  if (size.width > 0 && (dx + size.width - 1) / size.width > steps) {
+    steps = (dx + size.width - 1) / size.width;
+  }
+  if (size.height > 0 && (dy + size.height - 1) / size.height > steps) {
+    steps = (dy + size.height - 1) / size.height;
+  }
+  if (steps > SWEEP_STEPS_MAX) {
+    steps = SWEEP_STEPS_MAX;
+  }
+
+  LocatorP locator = get_locator();
+  WorldP world = get_world();
+
+  // One grid query for the whole segment; the sub-steps then just test boxes
+  // against this candidate list.  get_nearby() measures middle-to-middle from
+  // where the Rail is standing now, so the radius has to cover the length of
+  // the segment plus how far outside a swept box an overlapping middle can be.
+  // dx + dy is an upper bound on the segment's length.
+  PhysicalP nearby[OL_NEARBY_MAX];
+  int nitems = 0;
+  int radius = dx + dy + SWEEP_RADIUS_MARGIN;
+  locator->get_nearby(nearby,nitems,this,radius);
+
+  PhysicalP shooter = locator->lookup(get_shooter());
+  // shooter may be NULL, same as in collide().
+
+  // The stop the Rail is standing on was already tested by
+  // Locator::collision_checks() at the top of this turn, so start at 1.  Step
+  // `steps` is the endpoint, which collision_checks() will test again at the
+  // top of the next turn -- note_hit() makes that harmless.
+  int wallStep = -1;
+  for (int k = 1; k <= steps; k++) {
+    Size off;
+    off.width  = (delta.width  * k) / steps;
+    off.height = (delta.height * k) / steps;
+
+    Area swept = startArea;
+    swept.shift(off);
+
+    // Walls first: a Rail dies at the first wall its path crosses and must not
+    // touch anything on the far side of it.
+    if (!ignore_walls() && !world->open(swept)) {
+      wallStep = k;
+      break;
+    }
+
+    for (int n = 0; n < nitems; n++) {
+      PhysicalP other = nearby[n];
+      if (sweep_can_hit(other) &&
+          swept.overlap(other->get_area()) &&
+          note_hit(other->get_id())) {
+        other->corporeal_attack(shooter,get_damage());
+      }
+    }
+  }
+
+  if (wallStep >= 0 && !hit_wall_next()) {
+    // The path crossed a wall that fits entirely inside the gap between two
+    // stops, so Moving::_update_area_next() never saw it -- the endpoint is
+    // out in the open on the far side.  Put the Rail back on the last open
+    // sub-step and end it there.  (When the engine did see the wall we leave
+    // its handling alone: it has already pushed the Rail clear of the wall and
+    // set hitWallNext, and Shot::act() kills it on the next turn.)
+    Size off;
+    off.width  = (delta.width  * (wallStep - 1)) / steps;
+    off.height = (delta.height * (wallStep - 1)) / steps;
+    set_raw_pos_next(get_raw_pos() + off);
+    update_area_next(False);
+    kill_self();
+  }
+}
+
+
+
+void Rail::act()
+{
+  // Shot::act() kills us if we are already in a wall, then Moving::act()
+  // computes rawPosNext/areaNext -- the far end of this turn's segment, with
+  // the engine's own wall handling applied.  Only then can the segment be
+  // swept.
+  Shot::act();
+  sweep();
 }
 
 

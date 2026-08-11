@@ -130,7 +130,11 @@ public:
   void set_keyset(int dpyNum,UIkeyset basis,KeySym right[UI_KEYS_MAX][2],
                   KeySym left[UI_KEYS_MAX][2]);
 
-  void set_difficulty(int) {}
+  void set_difficulty(int val) {difficultyDefault = val;}
+  /* EFFECTS: Remember `val` as the choice the difficulty prompt offers as its
+     highlighted default (DIFF_NONE == no choice yet, i.e. fall back to
+     normal).  Game calls this with the value loaded from ~/.xevilrc. */
+
   void set_pause(Boolean);
 
   void set_prompt_difficulty();
@@ -164,6 +168,22 @@ public:
 
   static void set_fullscreen(Boolean val) {fullscreen = val;}
   static Boolean get_fullscreen() {return fullscreen;}
+
+  static void set_fullscreen_fill(Boolean val) {fullscreenFill = val;}
+  static Boolean get_fullscreen_fill() {return fullscreenFill;}
+  /* Fullscreen fill mode, persisted as fullscreen_mode= in ~/.xevilrc.
+       True (DEFAULT) == "fill": SDL stretches the game to the screen with the
+     aspect ratio preserved (a bar only where the aspect demands),
+     nearest-neighbour so it stays chunky rather than blurry.  This is what
+     fullscreen has always done, pixel for pixel, and it stays the default so
+     that upgrading never shrinks anyone's picture.
+       False == "crisp": the game is drawn at a whole-number pixel multiple and
+     centered in a black surround.  Sharper, but on a 16:9 screen it is a much
+     smaller picture (the game window is nearly 6:5), so it is opt-in only. */
+
+  int difficulty_default() const;
+  /* EFFECTS: The difficulty the prompt highlights and [space]/[enter] accept;
+     always a valid level (normal when nothing has been chosen yet). */
 
 
 private:
@@ -274,6 +294,7 @@ private:
 
   RoleType roleType;
   int difficulty;
+  int difficultyDefault;   // remembered choice offered at the prompt
   const DifficultyLevel *difficultyLevels;
 
   // Data-driven key bindings.
@@ -289,6 +310,7 @@ private:
   static Boolean smoothScroll;
   static int scale;
   static Boolean fullscreen;
+  static Boolean fullscreenFill;
   static Boolean reduceDraw;
   static Boolean useBuffer;
 };

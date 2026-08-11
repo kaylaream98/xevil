@@ -30,6 +30,11 @@ Boolean Ui::largeViewport = True;
 Boolean Ui::smoothScroll = False;
 int Ui::scale = 0;
 Boolean Ui::fullscreen = False;
+// "fill" is the DEFAULT because it is what fullscreen has always looked like:
+// the game stretched to the screen height with the classic window-grey
+// surround.  "crisp" (whole-pixel scaling, black surround) is strictly
+// opt-in -- see pick_fullscreen_scale() for why it cannot be the default.
+Boolean Ui::fullscreenFill = True;
 Boolean Ui::reduceDraw = False;
 Boolean Ui::useBuffer = True;
 
@@ -88,8 +93,9 @@ ViewportCallback Ui::viewportCallbacks[VIEWPORT_CB_NUM] = {
 // whole rc on quit) never clobbers it, and the X11 build never sees SDL codes.
 static Boolean sdl_keys_path(char *out,int outLen) {
 #if defined(_WIN32)
-  // Windows has no $HOME; store alongside the cmn config in %APPDATA%\XEvil\
-  // (fallback %USERPROFILE%), creating the directory on first use.
+  // Windows has no $HOME; store alongside the cmn config in the "XEvil"
+  // subdirectory of %APPDATA% (fallback %USERPROFILE%), creating the
+  // directory on first use.
   const char *base = getenv("APPDATA");
   if (!base || !*base) {
     base = getenv("USERPROFILE");
@@ -157,6 +163,7 @@ Ui::Ui(int *agc,char **agv,WorldP w,LocatorP l,char **d_names,
   promptDifficulty = False;
   roleType = rType;
   difficulty = DIFF_NONE;
+  difficultyDefault = DIFF_NONE;   // until Game hands us the remembered choice
 
   overlay = UIoverlayNone;
   overlayPage = 0;
@@ -225,7 +232,7 @@ Ui::Ui(int *agc,char **agv,WorldP w,LocatorP l,char **d_names,
   add_viewport();
   if (viewport && fullscreen) {
     // Honor an initial -fullscreen / config fullscreen=1 (window 0 only).
-    xvars.set_fullscreen(0,True,viewport->get_window_size());
+    xvars.set_fullscreen(0,True,viewport->get_window_size(),fullscreenFill);
   }
 }
 
@@ -268,6 +275,43 @@ void Ui::run_license_agreement() {
 
 
 
+// Pixel size of the real SDL game window at integer scale `s`.
+// Mirrors Viewport::layout(): arena is (26+2*2)*16 x (16+0)*16 == 480x256 world
+// pixels times `s`; below/above it sit chrome rows of height rowH == the f6x13
+// cell (13px) scaled plus panel padding (== TextPanel::get_unit height).  The
+// menu bar flows into VW_MENU_ROWS rows -- a count that does not vary with `s`,
+// since the window width and the font scale together -- plus 5 rows of status /
+// level / message chrome.  Verified against the running game: 480x408 at 1x,
+// 960x800 at 2x.
+#define VW_MENU_ROWS 3
+static void sdl_scale_window_size(int s,int *w,int *h) {
+  int rowH = 13 * s + 2 * PANEL_BORDER + 2 * PANEL_MARGAIN * s;   // == get_unit
+  *w = 480 * s;
+  *h = 256 * s + (VW_MENU_ROWS + 5) * rowH;
+}
+
+
+// The base scale to build the window at when going fullscreen with no explicit
+// -scale.  The two fullscreen modes want DIFFERENT answers here:
+//
+//   fill  -- SDL fits the whole window into the screen with a fractional,
+//     aspect-preserving factor, so the on-screen size is the same whatever
+//     base scale we pick; what the base scale really buys is render detail.
+//     The loop below is therefore deliberately generous: it uses a LOOSE
+//     estimate of the window height and lets the letterbox absorb the slack,
+//     which lands on the largest scale the screen can usefully feed.  This
+//     formula is kept VERBATIM from the pre-2.5 fullscreen path so that the
+//     default fullscreen picture is pixel-for-pixel what it has always been
+//     (1920x1080 -> base scale 3 -> 1440x1192 logical -> 1304x1080 on screen).
+//     Do not "correct" it: it is a compatibility constant, not an estimate.
+//
+//   crisp -- SDL is pinned to whole-number scaling, so a window that does not
+//     genuinely fit gets clamped to 1x and CLIPPED.  This mode must use the
+//     exact window size, and accept a smaller picture as the price of whole
+//     pixels.  That is also why crisp cannot be the default: at 1920x1080 the
+//     largest window that truly fits is 960x800 (base scale 2) and no whole
+//     multiple of it fits again, so crisp can only ever cover ~37% of the
+//     screen where fill covers ~68%.
 int Ui::pick_fullscreen_scale() {
   SDL_DisplayMode dm;
   int sw = 0, sh = 0;
@@ -278,31 +322,22 @@ int Ui::pick_fullscreen_scale() {
   if (sw <= 0) {
     return 2;
   }
-  // Approximate the SDL game window (arena scale*480 x scale*256 plus ~8 rows
-  // of menu/HUD chrome); the fullscreen logical letterbox absorbs any slack.
   for (int s = 4; s >= 1; s--) {
-    int fontH = (s >= 3) ? 24 : 13;
-    int winW = s * 480 + 2 * 5;
-    int winH = s * 256 + 8 * (fontH + 6);
+    int winW, winH;
+    if (fullscreenFill) {
+      // Legacy loose estimate -- see above, kept for pixel compatibility.
+      int fontH = (s >= 3) ? 24 : 13;
+      winW = s * 480 + 2 * 5;
+      winH = s * 256 + 8 * (fontH + 6);
+    }
+    else {
+      sdl_scale_window_size(s,&winW,&winH);
+    }
     if (winW <= sw && winH <= sh) {
       return s;
     }
   }
   return 1;
-}
-
-
-
-// Estimated pixel size of the real SDL game window at integer scale `s`.
-// Mirrors Viewport::layout(): arena is (26+2*2)*16 x (16+0)*16 == 480x256 world
-// pixels times `s`; below/above it sit chrome rows of height rowH == the f6x13
-// cell (13px) scaled plus panel padding (== TextPanel::get_unit height).  The
-// real window uses menuRows(1..2)+5 rows; we assume the 2-row (wrapped) menu bar
-// as a safe upper bound so a clamped window always leaves the menu bar on-screen.
-static void sdl_scale_window_size(int s,int *w,int *h) {
-  int rowH = 13 * s + 2 * PANEL_BORDER + 2 * PANEL_MARGAIN * s;   // == get_unit
-  *w = 480 * s;
-  *h = 256 * s + (2 + 5) * rowH;
 }
 
 
@@ -337,7 +372,7 @@ void Ui::toggle_fullscreen(int dpyNum) {
     return;
   }
   Boolean now = !xvars.get_window_fullscreen(dpyNum);
-  xvars.set_fullscreen(dpyNum,now,vp->get_window_size());
+  xvars.set_fullscreen(dpyNum,now,vp->get_window_size(),fullscreenFill);
   if (dpyNum == 0) {
     fullscreen = now;   // only window 0's state is the persisted preference
   }
@@ -531,11 +566,22 @@ void Ui::set_pause(Boolean val) {
 
 
 
+// The level the prompt highlights and [space]/[enter] accept.  DIFF_NONE (no
+// choice remembered yet, i.e. a first run) falls back to the classic normal.
+int Ui::difficulty_default() const {
+  if (difficultyDefault >= 0 && difficultyDefault < DIFFICULTY_LEVELS_NUM) {
+    return difficultyDefault;
+  }
+  return DIFF_NORMAL;
+}
+
+
+
 void Ui::set_prompt_difficulty() {
   difficulty = DIFF_NONE;   // unspecified until the user enters it.
   promptDifficulty = True;
   for (int i = 0; i < viewportsNum; i++)
-    if (viewports[i]) viewports[i]->set_prompt_difficulty(True);
+    if (viewports[i]) viewports[i]->set_prompt_difficulty(True,difficulty_default());
 }
 
 
@@ -776,9 +822,25 @@ static const char *ui_help_message =
 "left-hand a-s-d cluster (l ; / . k i o p move, a s d weapons, z x c items) "
 "drives player 2.\n"
 "\n"
-"Press F1 to pause the game; press any key to resume.  Press F11 to toggle "
-"fullscreen.  The Sound toggle turns sound on/off.  Settings are remembered in "
-"~/.xevilrc between sessions.\n"
+"KEYS OUTSIDE THE GAME:\n"
+"  F1  -- PAUSE.  A \"PAUSED\" banner appears; any key resumes.\n"
+"  F11 -- FULLSCREEN on/off, at any time.\n"
+"  Esc -- quit.\n"
+"\n"
+"DIFFICULTY: every \"New Game\" asks -- press 0 trivial, 1 normal, 2 hard, 3 "
+"bend-over.  Your last choice is highlighted, and [space] or [enter] keeps it, "
+"so changing difficulty is just New Game and a different number.  It is "
+"remembered in ~/.xevilrc as difficulty=.  Run with -difficulty <name> to pin "
+"one and skip the question.\n"
+"\n"
+"FULLSCREEN LOOK: fullscreen_mode=fill in ~/.xevilrc (the default) stretches "
+"the game to the screen with the aspect ratio kept, while "
+"fullscreen_mode=crisp draws it at whole pixels in a black surround -- "
+"sharper, but a smaller picture on a widescreen monitor.  Or start with "
+"-fullscreen_fill / -fullscreen_crisp.\n"
+"\n"
+"The Sound toggle turns sound on/off.  Settings are remembered in ~/.xevilrc "
+"between sessions.\n"
 "\n"
 "In this Help panel: PageDown/Space and PageUp/Backspace turn the page; Esc "
 "closes.\n"
@@ -1063,7 +1125,7 @@ void Ui::process_event(int,SDL_Event *event) {
       break;
     }
     if (promptDifficulty) {
-      change_difficulty(DIFF_NORMAL);
+      change_difficulty(difficulty_default());
       break;
     }
     if (pause) {
@@ -1102,8 +1164,10 @@ void Ui::process_event(int,SDL_Event *event) {
       int d = difficulty_from_key(sym);
       if (d != DIFF_NONE) {
         change_difficulty(d);
-      } else if (sym == SDLK_SPACE) {
-        change_difficulty(DIFF_NORMAL);
+      } else if (sym == SDLK_SPACE || sym == SDLK_RETURN ||
+                 sym == SDLK_KP_ENTER) {
+        // Take the highlighted default (your last choice).
+        change_difficulty(difficulty_default());
       }
       break;
     }
@@ -1198,9 +1262,26 @@ void Ui::pre_clock() {
   for (int d = 0; d < xvars.dpyMax; d++) {
     xvars.set_active_display(d);
     Pixel bg = xvars.windowBg[d];
-    SDL_SetRenderDrawColor(xvars.renderer,Pixel_r(bg),Pixel_g(bg),Pixel_b(bg),
-                           255);
-    SDL_RenderClear(xvars.renderer);
+    int logW = 0,logH = 0;
+    SDL_RenderGetLogicalSize(xvars.renderer,&logW,&logH);
+    if (!fullscreenFill && logW > 0 && logH > 0) {
+      // Crisp fullscreen only.  Whole-pixel scaling leaves a wide margin, and
+      // a wide margin wants to be black, so paint the screen black (RenderClear
+      // ignores the logical viewport and covers the lot) and then give the game
+      // itself its window grey.  In fill mode the margin is a thin aspect-ratio
+      // bar, and it stays window grey -- exactly as fullscreen always looked.
+      SDL_SetRenderDrawColor(xvars.renderer,0,0,0,255);
+      SDL_RenderClear(xvars.renderer);
+      SDL_Rect game = {0,0,logW,logH};
+      SDL_SetRenderDrawColor(xvars.renderer,Pixel_r(bg),Pixel_g(bg),
+                             Pixel_b(bg),255);
+      SDL_RenderFillRect(xvars.renderer,&game);
+    }
+    else {
+      SDL_SetRenderDrawColor(xvars.renderer,Pixel_r(bg),Pixel_g(bg),
+                             Pixel_b(bg),255);
+      SDL_RenderClear(xvars.renderer);
+    }
 
     Viewport *vp = viewport_on_display(d);
     if (vp) {

@@ -70,7 +70,7 @@ const GunContext CryoRay::context =
   24, /* ammoMax */
 
   { /** WeaponContext **/
-    SoundNames::SWAPPER,
+    SoundNames::CRYO,
 
     { /** ItemContext **/
       True, /* persists */

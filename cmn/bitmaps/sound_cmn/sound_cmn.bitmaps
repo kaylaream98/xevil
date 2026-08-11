@@ -22,51 +22,95 @@
 
 // "sound_cmn.bitmaps"
 
+// SoundName -> Win32 resource ID, one row per SoundName, in enum order.
+//
+// The rows live in a macro list because the table has to be counted on
+// platforms that cannot compile it.  R() is handed the resource ID; the
+// counting expansion below simply discards its argument, so the IDW_/IDM_
+// tokens -- which only exist behind win32/resource.h -- are never evaluated off
+// Windows.  Only the number of rows is.
+//
+// That is the whole point of the restructuring: this table must stay aligned
+// with the SoundNames enum, but it used to sit entirely inside #if WIN32, so on
+// Linux/SDL -- the only place this project is actually built and run -- adding a
+// SoundName without adding a row here compiled cleanly and shipped a silently
+// misaligned table.  The check at the bottom now fails the build on every
+// platform instead.
+#define SOUND_CMN_NAME_ROWS(R)                                                 \
+  R(0)                        /* 0  dummy value                            */  \
+  /*  Resource Name               SoundName                                */  \
+  R(0)                        /* IDW_SOUNDTRACK -- SOUNDTRACK             */   \
+  R(0)                        /* IDW_SOUNDTRACK_LEVELS -- SOUNDTRACK_LEVELS */ \
+  R(0)                        /* IDW_SOUNDTRACK_SEAL -- SOUNDTRACK_SEAL   */   \
+  R(IDW_CHAINSAW_SOUND)       /* CHAINSAW_SOUND                           */   \
+  R(IDW_FLAMETHROWER)         /* FLAMETHROWER                             */   \
+  R(IDW_DEATH)                /* DEATH                                    */   \
+  R(IDW_SEAL_DEATH)           /* SEAL_DEATH                               */   \
+  R(IDW_HUGGER_DEATH)         /* HUGGER_DEATH                             */   \
+  R(IDW_FROG_DEATH)           /* FROG_DEATH                               */   \
+  R(IDW_BREAKDOWN)            /* BREAKDOWN                                */   \
+  R(IDW_BANG)                 /* BANG                                     */   \
+  R(IDW_PISTOL)               /* PISTOL                                   */   \
+  R(IDW_MGUN)                 /* MGUN                                     */   \
+  R(IDW_LAUNCHER)             /* LAUNCHER                                 */   \
+  R(IDW_EXPLOSION)            /* EXPLOSION                                */   \
+  R(IDW_DOG_DEATH)            /* DOG_DEATH                                */   \
+  R(IDW_LASER)                /* LASER                                    */   \
+  R(IDW_HERO_ATTACK)          /* HERO_ATTACK                              */   \
+  R(IDW_NINJA_ATTACK)         /* NINJA_ATTACK                             */   \
+  R(IDW_DOG_ATTACK)           /* DOG_ATTACK                               */   \
+  R(IDW_CHOP_DEATH)           /* CHOP_DEATH                               */   \
+  R(IDW_DOPPEL_USE)           /* DOPPEL_USE                               */   \
+  R(IDW_CLOAK_USE)            /* CLOAK_USE                                */   \
+  R(IDW_TRANS_USE)            /* TRANS_USE                                */   \
+  R(IDW_SHIELD_USE)           /* SHIELD_USE                               */   \
+  R(IDW_NINJA_DEATH)          /* NINJA_DEATH                              */   \
+  R(IDW_FROGGUN)              /* FROGGUN                                  */   \
+  R(IDW_LANCER)               /* LANCER                                   */   \
+  R(IDW_SWAPPER)              /* SWAPPER                                  */   \
+  R(IDM_FIRESOUNDTRACK)       /* FIRE                                     */   \
+  R(IDM_HIVESOUNDTRACK)       /* HIVE                                     */   \
+  R(IDM_KILLSOUNDTRACK)       /* KILLKILLKILL                             */   \
+  R(IDM_SEALSOUNDTRACK)       /* SEAL                                     */   \
+  R(IDM_ZEEPEEGSOUNDTRACK)    /* ZEEPEEG                                  */   \
+  R(IDM_NIGHTSKYSOUNDTRACK)   /* NIGHTSKY                                 */   \
+  R(IDM_SWEETDARKSOUNDTRACK)  /* SWEETDARK                                */   \
+  /*  Restored in XEvil 2.5; the "painful on cheap sound cards" era is over. */ \
+  R(IDM_TERRAEXMSOUNDTRACK)   /* TERRAEXM                                 */   \
+  R(IDM_NEWSONGSOUNDTRACK)    /* NEWSONG                                  */   \
+  R(0)                        /* WOOB -- X11-only, no Win32 resource      */   \
+  /*  XEvil 2.5 additions.  Same story as WOOB: no Win32 resource ID exists  */ \
+  /*  for them, so these rows are zeros purely to keep names[] aligned to    */ \
+  /*  SOUND_MAX.  The Windows build now ships through SDL (sdl/gen_audio.py  */ \
+  /*  embeds every WAV in sounds/ by filename), which ignores this table.    */ \
+  R(0)                        /* SHOTGUN                                  */   \
+  R(0)                        /* RAILGUN                                  */   \
+  R(0)                        /* CRYO                                     */   \
+  R(0)                        /* VAMPIRE_ATTACK                           */   \
+  R(0)                        /* VAMPIRE_DEATH                            */   \
+  R(0)                        /* MINE_ARM                                 */
+
 #if WIN32
+#define SOUND_CMN_ROW_ID(id) id,
 unsigned int SoundNames::names[SoundNames::SOUND_MAX] = {
-    0,  // dummy value
-//
-//  Resource Name               SoundName
-//
-    0, //IDW_SOUNDTRACK,          // SOUNDTRACK
-    0, //IDW_SOUNDTRACK_LEVELS,   // SOUNDTRACK_LEVELS
-    0, //IDW_SOUNDTRACK_SEAL,     // SOUNDTRACK_SEAL
-    IDW_CHAINSAW_SOUND,      // CHAINSAW_SOUND
-    IDW_FLAMETHROWER,        // FLAMETHROWER
-    IDW_DEATH,               // DEATH
-    IDW_SEAL_DEATH,          // SEAL_DEATH
-    IDW_HUGGER_DEATH,        // HUGGER_DEATH
-    IDW_FROG_DEATH,          // FROG_DEATH
-    IDW_BREAKDOWN,           // BREAKDOWN
-    IDW_BANG,                // BANG
-    IDW_PISTOL,              // PISTOL
-    IDW_MGUN,                // MGUN
-    IDW_LAUNCHER,            // LAUNCHER
-    IDW_EXPLOSION,           // EXPLOSION
-    IDW_DOG_DEATH,           // DOG_DEATH
-    IDW_LASER,               // LASER
-    IDW_HERO_ATTACK,         // HERO_ATTACK
-    IDW_NINJA_ATTACK,        // NINJA_ATTACK
-    IDW_DOG_ATTACK,          // DOG_ATTACK
-    IDW_CHOP_DEATH,          // CHOP_DEATH
-    IDW_DOPPEL_USE,          // DOPPEL_USE
-    IDW_CLOAK_USE,           // CLOAK_USE
-    IDW_TRANS_USE,           // TRANS_USE
-    IDW_SHIELD_USE,          // SHIELD_USE
-    IDW_NINJA_DEATH,         // NINJA_DEATH
-    IDW_FROGGUN,             // FROGGUN
-    IDW_LANCER,              // LANCER
-    IDW_SWAPPER,             // SWAPPER, 
-    IDM_FIRESOUNDTRACK,      // FIRE
-    IDM_HIVESOUNDTRACK,      // HIVE
-    IDM_KILLSOUNDTRACK,      // KILLKILLKILL
-    IDM_SEALSOUNDTRACK,      // SEAL
-    IDM_ZEEPEEGSOUNDTRACK,
-    IDM_NIGHTSKYSOUNDTRACK,
-    IDM_SWEETDARKSOUNDTRACK,
-    // Restored in XEvil 2.5; the "painful on cheap sound cards" era is over.
-    IDM_TERRAEXMSOUNDTRACK,
-    IDM_NEWSONGSOUNDTRACK,
-    0, // WOOB -- X11-only, no Win32 resource; keeps names[] aligned to SOUND_MAX.
+  SOUND_CMN_NAME_ROWS(SOUND_CMN_ROW_ID)
 };
+#undef SOUND_CMN_ROW_ID
 #endif
+
+// One byte per row of the list above, compiled everywhere.  The argument is
+// dropped, so this costs nothing but a count -- and gives the check below
+// something to measure on platforms where names[] itself does not exist.
+// (sizeof names[] could not do the job even on Win32: it is *declared*
+// [SOUND_MAX], so a missing row would zero-fill rather than change its size.)
+#define SOUND_CMN_ROW_TALLY(id) 1,
+static const char soundCmnRowTally[] = {
+  SOUND_CMN_NAME_ROWS(SOUND_CMN_ROW_TALLY)
+};
+#undef SOUND_CMN_ROW_TALLY
+
+// Adding a SoundName without adding a row above (or vice versa) makes this
+// array size negative and the build fails here, on Linux and Windows alike,
+// instead of handing Win32 a table shifted by one from the enum.
+typedef char sound_cmn_names_match_enum
+  [((int)sizeof(soundCmnRowTally) == (int)SoundNames::SOUND_MAX) ? 1 : -1];

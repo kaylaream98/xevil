@@ -86,7 +86,7 @@ const CreatureContext Vampire::creatureContext =
 
   True, /* biological */
   DROPLET_BLOOD, /* dropletType */
-  SoundNames::NINJA_DEATH,
+  SoundNames::VAMPIRE_DEATH,
 
   {/** MovingContext **/
 #if X11
@@ -275,7 +275,7 @@ const FighterContext Vampire::fighterContext =
    {6,0},{3,30},
   },
 
-  SoundNames::NINJA_ATTACK,
+  SoundNames::VAMPIRE_ATTACK,
 };
 
 

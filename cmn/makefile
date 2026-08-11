@@ -137,7 +137,8 @@ $(OBJ_DIR)/xetp_basic.o: xetp_basic.cpp utils.h xetp_basic.h streams.h
 $(OBJ_DIR)/id.o: id.cpp id.h utils.h streams.h
 	$(CC) $(DEBUG_OPT) $(ALL_CFLAGS) $(ALL_INCL_DIRS) -o $(OBJ_DIR)/id.o -c id.cpp
 
-$(OBJ_DIR)/sound_cmn.o: sound_cmn.cpp sound_cmn.h utils.h streams.h
+$(OBJ_DIR)/sound_cmn.o: sound_cmn.cpp sound_cmn.h utils.h streams.h \
+	bitmaps/sound_cmn/sound_cmn.bitmaps
 	$(CC) $(DEBUG_OPT) $(ALL_CFLAGS) $(ALL_INCL_DIRS) -o $(OBJ_DIR)/sound_cmn.o -c sound_cmn.cpp
 
 $(OBJ_DIR)/ui_cmn.o: ui_cmn.cpp ui_cmn.h utils.h

@@ -70,11 +70,11 @@ const GunContext Railgun::context =
   10, /* ammoMax */
 
   { /** WeaponContext **/
-    SoundNames::LASER,
+    SoundNames::RAILGUN,
 
     { /** ItemContext **/
       True, /* persists */
-      8000, /* coolness */
+      8500, /* coolness (unique among weapons; Launcher already owns 8000) */
       0, /*item use sound */
       { /** FallingContext **/
         {/** MovingContext **/

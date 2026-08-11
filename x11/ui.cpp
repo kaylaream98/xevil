@@ -227,6 +227,7 @@ Ui::Ui(int *agc, char **agv, WorldP w, LocatorP l,char **d_names,
   }
   
   difficulty = DIFF_NONE; // Not yet set.
+  difficultyDefault = DIFF_NONE; // Until Game hands us the remembered choice.
 
   init_x();
   
@@ -419,7 +420,9 @@ void Ui::set_prompt_difficulty() {
   difficulty = DIFF_NONE; // unspecified until user enters it.
   for (int n = 0; n < viewports.length(); n++) {
     Viewport* vPort = (Viewport*)viewports.get(n);
-    vPort->set_prompt_difficulty(True);
+    // difficultyDefault is the choice remembered in ~/.xevilrc; the Viewport
+    // highlights it and space/Return accept it.
+    vPort->set_prompt_difficulty(True,difficultyDefault);
   }
 }
 
@@ -1936,6 +1939,11 @@ char* Ui::helpMessage =
 "keyboard.\n"
 "\n"
 "Press F1 to pause the game.  Press any key to resume.\n"
+"\n"
+"DIFFICULTY: every \"New Game\" asks -- press 0 trivial, 1 normal, 2 hard, "
+"3 bend-over.  Your last choice is highlighted and [space] or [Return] keeps "
+"it, so changing difficulty is just New Game and a different number.  Run "
+"with -difficulty <name> to pin one and skip the question.\n"
 "\n"
 "Use the \"Sound\" toggle in the menu bar to turn sound on or off.  Your "
 "settings are remembered in ~/.xevilrc between sessions.\n"

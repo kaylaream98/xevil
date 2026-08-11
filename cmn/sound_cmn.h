@@ -110,6 +110,21 @@ public:
     // up on X11 only (WOOB.WAV was orphaned in the Win32 resources).
     WOOB,
 
+    // XEvil 2.5 voices for the 2.5 content.  Each is derived from the original
+    // palette (see sounds/README.md) so it stays in the family of the classic
+    // sound it replaces: SHOTGUN from pistol, RAILGUN from laser+lancer, CRYO
+    // from swapper, VAMPIRE_* from ninja_attack/death.  Like WOOB these have no
+    // Win32 resource IDs -- they load by filename through x11/sound.cpp
+    // SOUND_FILES[] (X11 directory) and the SDL embedded-audio manifest.
+    SHOTGUN,
+    RAILGUN,
+    CRYO,
+    VAMPIRE_ATTACK,
+    VAMPIRE_DEATH,
+    // Emitted by Mine::act() on the !armed -> armed transition, when a planted
+    // mine's grace period expires and it goes live.  Derived from bang.
+    MINE_ARM,
+
     // Don't change the following.
     SOUND_MAX,
     SOUND_RANDOM = -1,

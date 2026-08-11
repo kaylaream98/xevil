@@ -73,6 +73,16 @@ SOUND_OBJS  = $(OBJ_DIR)/sound.o $(OBJ_DIR)/miniaudio.o \
 # include it (cmn objects included, since they consume xdata.h/ui.h/sound.h).
 SDL_HEADERS = xdata.h ui.h sound.h panel.h viewport.h font.h xpm.h dialog.h
 
+# Shared headers and the .bitmaps data tables they pull in.  These MUST be
+# prerequisites: without them an edit to e.g. cmn/sound_cmn.h left BUILD/cmn/
+# objects stale, and because SoundNames::lookup() compares against SOUND_MAX,
+# a stale sound_cmn.o silently rejected every SoundName added since it was
+# built -- the sound simply never played, with no build error and no warning.
+# Coarse (any cmn header rebuilds all cmn objects) but correct, and the whole
+# cmn set compiles in well under a minute.
+CMN_HEADERS = $(wildcard $(DEPTH)/cmn/*.h) \
+              $(wildcard $(DEPTH)/cmn/bitmaps/*/*.bitmaps)
+
 
 #### Default goal: the native SDL game.
 all: $(OBJ_DIR)/xevil-sdl
@@ -90,12 +100,13 @@ $(OBJ_DIR)/xevil-sdl: $(CMN_OBJS) $(SDL_OBJS) $(SOUND_OBJS)
 
 
 #### cmn/*.cpp -> BUILD/cmn/*.o  (SDL frontend headers, separate objdir)
-$(CMN_OBJ_DIR)/%.o: $(DEPTH)/cmn/%.cpp $(SDL_HEADERS) | $(CMN_OBJ_DIR)
+$(CMN_OBJ_DIR)/%.o: $(DEPTH)/cmn/%.cpp $(SDL_HEADERS) $(CMN_HEADERS) \
+                    | $(CMN_OBJ_DIR)
 	$(CXX) $(CMN_CFLAGS) $(ALL_INCL_DIRS) -o $@ -c $<
 
 
 #### sdl/*.cpp -> BUILD/*.o
-$(OBJ_DIR)/%.o: %.cpp $(SDL_HEADERS) | $(OBJ_DIR)
+$(OBJ_DIR)/%.o: %.cpp $(SDL_HEADERS) $(CMN_HEADERS) | $(OBJ_DIR)
 	$(CXX) $(SDL_CFLAGS_ALL) $(ALL_INCL_DIRS) -o $@ -c $<
 
 

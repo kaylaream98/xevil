@@ -198,9 +198,10 @@ class Ui: public IDifficultyCallback,
   /* REQUIRES: Must be called at least once before the first clock. */
   /* IMPLEMENTATION NOTE: Sets keycodes[0 and 1] */
 
-  void set_difficulty(int) {}
-  /* NOTE: Dummy, could be used to get default value for 
-     set_prompt_difficulty. */
+  void set_difficulty(int val) {difficultyDefault = val;}
+  /* EFFECTS: Remember val as the default offered by set_prompt_difficulty
+     (DIFF_NONE == nothing chosen yet, i.e. fall back to normal).  Game calls
+     this with the choice loaded from ~/.xevilrc. */
 
   void set_pause(Boolean);
 
@@ -405,6 +406,7 @@ class Ui: public IDifficultyCallback,
 
   // This value is mofified by the Viewport via giving it th
   int difficulty;
+  int difficultyDefault;  // Remembered choice the prompt highlights.
   const DifficultyLevel* difficultyLevels;  // Size DIFFICULTY_LEVELS_NUM.
 
   // The actual control learning panel.

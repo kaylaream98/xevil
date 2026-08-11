@@ -83,8 +83,14 @@ const AnimatedContext Mine::context =
  { /** AnimatedContext **/
   { /** ItemContext **/
     False, /* persists */
-    90, /* coolness */
-    0, /*item use sound*/  // The Explosion object makes the noise.
+    85, /* coolness (unique among items; Transmogifier already owns 90) */
+    // ItemContext::useSound is emitted by Item::use(), which Mine::use()
+    // deliberately does not chain to (planting is silent, and the Explosion
+    // object makes the detonation noise).  The 2.5 arming click is therefore
+    // not wired here: SoundNames::MINE_ARM is submitted from the
+    // !armed -> armed transition in Mine::act(), where the event actually
+    // happens, a full grace period after the plant.
+    0, /*item use sound*/
     { /** FallingContext **/
       {/** MovingContext **/
 #if X11

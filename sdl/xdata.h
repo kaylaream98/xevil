@@ -136,10 +136,17 @@ public:
      second local-player window so both are visible). */
 
   // ---- Fullscreen (SDL_WINDOW_FULLSCREEN_DESKTOP + logical letterbox) ----
-  void set_fullscreen(int dpyNum,Boolean on,const Size &logical);
+  void set_fullscreen(int dpyNum,Boolean on,const Size &logical,
+                      Boolean fill = False);
   /* EFFECTS: Toggle desktop-fullscreen for a window.  `logical` is the game's
-     native window size; SDL scales it up to the desktop with black bars
-     (RenderSetLogicalSize), so all the pixel-coordinate draw code is unchanged.
+     native window size; SDL maps it onto the desktop with black bars
+     (RenderSetLogicalSize), so all the pixel-coordinate draw code -- and the
+     mouse coordinates SDL reports back -- are unchanged.
+       fill == False ("crisp"): whole-number pixel multiples only
+     (RenderSetIntegerScale), so the art never gets uneven rows; the leftover
+     screen is a black surround.
+       fill == True: the largest aspect-preserving stretch that fits, so the
+     game reaches the edge of the screen on at least one axis.
      Off restores windowed mode at `logical` size. */
   Boolean get_window_fullscreen(int dpyNum);
 

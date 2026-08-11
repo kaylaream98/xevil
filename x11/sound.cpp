@@ -50,7 +50,7 @@
 // SoundName -> asset filename.  Indexed directly by SoundName value; NULL means
 // "no file" (index 0 reserved; the three WAV soundtracks 1..3 were disabled in
 // 2.02 and were never extracted).  MUST stay in sync with the SoundNames enum
-// in sound_cmn.h -- a runtime assert below checks the count.
+// in sound_cmn.h -- the compile-time check below enforces the count.
 static const char *const SOUND_FILES[] = {
   NULL,               // 0  (reserved)
   NULL,               // 1  SOUNDTRACK          (disabled WAV soundtrack)
@@ -92,9 +92,23 @@ static const char *const SOUND_FILES[] = {
   "terraexm.mp3",     // 37 TERRAEXM_SOUNDTRACK  (restored in 2.5)
   "newsong.mp3",      // 38 NEWSONG_SOUNDTRACK
   "woob.wav",         // 39 WOOB  (GravityWell collapse; orphaned since 1997)
+  // XEvil 2.5 voices, derived from the palette above (see sounds/README.md).
+  "shotgun.wav",        // 40 SHOTGUN
+  "railgun.wav",        // 41 RAILGUN
+  "cryo.wav",           // 42 CRYO
+  "vampire_attack.wav", // 43 VAMPIRE_ATTACK
+  "vampire_death.wav",  // 44 VAMPIRE_DEATH
+  "mine_arm.wav",       // 45 MINE_ARM
 };
 
 #define SOUND_FILES_NUM ((int)(sizeof(SOUND_FILES) / sizeof(SOUND_FILES[0])))
+
+// Enforce the "MUST stay in sync" comment above at compile time: adding a
+// SoundName without adding its row here (or vice versa) makes the array size
+// negative and the build fails on this line instead of playing the wrong
+// sound -- or reading past the end of SOUND_FILES -- at runtime.
+typedef char sound_files_match_enum
+  [(SOUND_FILES_NUM == (int)SoundNames::SOUND_MAX) ? 1 : -1];
 
 // The streaming soundtracks available to the X11 random rotation.  This is the
 // full set of MIDI-derived tracks, including terraexm (26 years overdue).

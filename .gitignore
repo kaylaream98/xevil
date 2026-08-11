@@ -18,9 +18,13 @@ sdl/BUILD/embedded_audio_data.c.tmp
 sdl/BUILD-WIN/
 
 # Packaged Windows release artifacts produced by `make dist-windows`: the
-# single-file exe (~48MB) and the zip.  Reproducible; never commit.  The
-# tracked dist/README-WINDOWS.txt (the zip's text companion) is kept.
+# stripped single-file exe (~35MB) and the zip (~31MB).  Reproducible; never
+# commit.  The tracked dist/README-WINDOWS.txt (the zip's companion) is kept.
 dist/xevil.exe
 dist/*.zip
 sdl/BUILD/
 sdl/BUILD-WIN/
+
+# Python bytecode from the sound-derivation tools (sounds/tools/*.py).
+__pycache__/
+*.pyc

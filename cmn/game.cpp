@@ -814,13 +814,16 @@ Game::Game(int *arg_c,char **arg_v)
 
   // Always normal difficulty for demo.
   difficulty = DIFF_NORMAL;
+  difficultyForced = False;
 #if WIN32
   // Since Windows has a good UI for setting difficulty, don't force
   // user to set it.
   difficultyNext = DIFF_NORMAL;
+  difficultyForced = True;
 #endif
 #if X11
-  // DIFF_NONE will always ask for level of difficulty.
+  // DIFF_NONE means "no remembered choice yet"; config_load() may replace it
+  // with the player's last pick, which then becomes the prompt's default.
   difficultyNext = DIFF_NONE;
 #endif
 
@@ -1274,22 +1277,38 @@ void Game::post_clock() {
       
     case newGame: {
       if (timer.ready()) {
-        // Check if we have to ask the user for a difficulty setting.
-        if (difficultyNext == DIFF_NONE && // not set yet
+        // Ask for the difficulty on EVERY new game (2.02 asked once per
+        // process and then locked the choice in, which -- once 2.5 started
+        // remembering it in ~/.xevilrc -- meant a player could never change
+        // it again).  difficultyNext carries the remembered choice, which the
+        // Ui shows as the highlighted default.
+        if (!difficultyForced &&
             styleNext->need_difficulty(enemiesNumNext)) {
             if (ui) {
               // need to get difficulty level from user.
               state = getDifficulty;
+              // Offer the remembered choice as the default (DIFF_NONE on a
+              // first run: the Ui falls back to normal).
+              ui->set_difficulty(difficultyNext);
               ui->set_prompt_difficulty();
             }
             else {
               // No way to ask user for difficulty, assume DIFF_NORMAL
-              difficultyNext = DIFF_NORMAL;
+              if (difficultyNext == DIFF_NONE) {
+                difficultyNext = DIFF_NORMAL;
+              }
               reset();
             }
 	      }
 	      else {
-          // leave difficulty alone.  Start game.
+          // Difficulty is pinned for this run, or this style has no use for
+          // one.  Leave it alone and start the game.  (The guard is belt and
+          // braces: difficultyForced always comes with a real value, and
+          // nothing reads difficultyNext when need_difficulty() is false.)
+          if (difficultyNext == DIFF_NONE &&
+              styleNext->need_difficulty(enemiesNumNext)) {
+            difficultyNext = DIFF_NORMAL;
+          }
           reset();
         }
       }
@@ -1304,8 +1323,11 @@ void Game::post_clock() {
 	      difficultyNext = uiDiff;
 	      ui->unset_prompt_difficulty();
         ui->set_difficulty(difficultyNext);  // Make sure UI has new value.
-        // reset();
-        new_game();
+        // Start the game directly.  (Going back through new_game() would
+        // re-enter the newGame state, which now asks for the difficulty every
+        // time -- and would therefore ask again forever.)  reset() persists
+        // the fresh choice to ~/.xevilrc as the next prompt's default.
+        reset();
       }
       // else stay in getDifficulty until User supplies a value.
     }
@@ -2178,6 +2200,20 @@ void Game::config_load() {
       // command line (parsed after config_load) still wins.
       Ui::set_fullscreen(ival ? True : False);
     }
+#if defined(SDL)
+    else if (!strcmp(key,"fullscreen_mode")) {
+      // How fullscreen uses the extra screen: "fill" (the default -- stretch
+      // to the screen, aspect preserved) or "crisp" (whole pixels, black
+      // surround).  An rc with no fullscreen_mode= line, i.e. every rc written
+      // before 2.5, therefore keeps the classic filled picture.
+      if (!strcmp(val,"fill")) {
+        Ui::set_fullscreen_fill(True);
+      }
+      else if (!strcmp(val,"crisp")) {
+        Ui::set_fullscreen_fill(False);
+      }
+    }
+#endif
     // Unknown keys are silently ignored (forward compatibility).
   }
   fclose(fp);
@@ -2203,7 +2239,9 @@ void Game::config_save() {
   GameStyleType styleType =
     styleNext ? styleNext->get_type() : (style ? style->get_type() : LEVELS);
 
-  // Only persist a chosen difficulty (don't force-skip the first-run prompt).
+  // The last difficulty the player chose.  It comes back as the highlighted
+  // default of the "Enter level of difficulty" prompt, which every New Game
+  // shows -- so this remembers a preference, it does not lock one in.
   if (difficultyNext != DIFF_NONE) {
     fprintf(fp,"difficulty=%d\n",difficultyNext);
   }
@@ -2224,6 +2262,9 @@ void Game::config_save() {
     fprintf(fp,"scale=%d\n",Ui::get_scale());
   }
   fprintf(fp,"fullscreen=%d\n",Ui::get_fullscreen() ? 1 : 0);
+#if defined(SDL)
+  fprintf(fp,"fullscreen_mode=%s\n",Ui::get_fullscreen_fill() ? "fill" : "crisp");
+#endif
 
   fclose(fp);
 }
@@ -2860,10 +2901,14 @@ void Game::parse_args(int *argc,char **argv) {
       DebugInfo::turn_on();
     }
     else if (!strcmp("-difficulty",argv[n]) && (n + 1 < *argc)) {
+      // Pins the difficulty for this run: no prompt at all, not even the
+      // first New Game.
       n++;
       for (int m = 0; m < DIFFICULTY_LEVELS_NUM; m++) {
-        if (!strcmp(difficultyLevels[m].name,argv[n]))
+        if (!strcmp(difficultyLevels[m].name,argv[n])) {
           difficultyNext = m;
+          difficultyForced = True;
+        }
       }
     }
     else if (!strcmp("-disconnect_time",argv[n]) && (n + 1 < *argc)) {
@@ -2935,9 +2980,21 @@ void Game::parse_args(int *argc,char **argv) {
         << "    2=large/default, 3 and 4 enlarge everything).  Clamps down" << endl
         << "    automatically if the window would not fit the screen." << endl
         << "-fullscreen or -no_fullscreen" << endl
-        << "    fill the whole screen: the game is centered with a black" << endl
-        << "    surround.  With no -scale, auto-picks the largest scale that" << endl
-        << "    fits.  Saved to ~/.xevilrc." << endl
+        << "    play on the whole screen.  With no -scale, auto-picks the" << endl
+        << "    largest scale that fits.  Saved to ~/.xevilrc."
+#if defined(SDL)
+        << "  F11 toggles" << endl
+        << "    it in-game."
+#endif
+        << endl
+#if defined(SDL)
+        << "-fullscreen_fill or -fullscreen_crisp" << endl
+        << "    go fullscreen and pick how the screen is used.  'fill' (the" << endl
+        << "    default) stretches the game to the screen with the aspect" << endl
+        << "    ratio kept; 'crisp' draws whole pixels only, in a black" << endl
+        << "    surround -- sharper, but a smaller picture on a widescreen" << endl
+        << "    monitor.  Saved as fullscreen_mode= in ~/.xevilrc." << endl
+#endif
 #endif
         << "-h or -help" << endl
         << "    print help message" << endl
@@ -2968,9 +3025,20 @@ void Game::parse_args(int *argc,char **argv) {
         << "    set sound-effects volume (default 70)" << endl
         << "-music_volume <0-100>" << endl
         << "    set soundtrack volume (default 50)" << endl
+        << "-difficulty <trivial|normal|hard|bend-over>" << endl
+        << "    pin the difficulty for this run and skip the prompt.  Without" << endl
+        << "    it, every New Game asks, with your last choice highlighted." << endl
         << endl
-        << "In-game: press F1 to pause (any key resumes).  The menu-bar \"Sound\"" << endl
-        << "toggle turns sound on/off.  Settings are saved to ~/.xevilrc." << endl
+        << "In-game: press F1 to pause (any key resumes)."
+#if defined(SDL)
+        << "  Press F11 to toggle" << endl
+        << "fullscreen.  "
+#else
+        << endl
+#endif
+        << "\"New Game\" always asks for the level of difficulty," << endl
+        << "starting from your last choice.  The menu-bar \"Sound\" toggle turns" << endl
+        << "sound on/off.  Settings are saved to ~/.xevilrc." << endl
         << endl
         << "-connect <servername> {serverport}" << endl
         << "    connect as a client to an XEvil server, serverport is optional" << endl
@@ -3088,6 +3156,18 @@ void Game::parse_args(int *argc,char **argv) {
       // Force windowed even if the config file persisted fullscreen=1.
       Ui::set_fullscreen(False);
     }
+#if defined(SDL)
+    else if (!strcmp("-fullscreen_fill",argv[n])) {
+      // Go fullscreen AND stretch the game to the screen (aspect preserved).
+      Ui::set_fullscreen(True);
+      Ui::set_fullscreen_fill(True);
+    }
+    else if (!strcmp("-fullscreen_crisp",argv[n])) {
+      // Go fullscreen with whole-pixel scaling and a black surround.
+      Ui::set_fullscreen(True);
+      Ui::set_fullscreen_fill(False);
+    }
+#endif
 #endif // X11
     else if (!strcmp("-levels",argv[n])) {
       delete style;

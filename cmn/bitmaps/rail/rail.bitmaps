@@ -57,6 +57,62 @@ ShotXdata Rail::xdata;
 const ShotContext Rail::context =
 {/** ShotContext **/
   70, /* damage */
+  /* speed -- the Rail is the fastest thing in the game and stays that way.
+
+     A Shot teleports `speed` pixels per turn (Shot::Shot sets vel = speed *
+     unit; Moving::_act does rawPosNext = rawPos + vel) and
+     Locator::collision_checks() runs BEFORE the move, so the engine only ever
+     tests for overlap at those discrete stops.  The engine has no swept-volume
+     test: a shot covers just its own length out of every `speed` pixels it
+     crosses, and anything that fits in the (speed - length) gap is tunnelled
+     straight through.  The sizes[] below are 30x1 / 1x30, so at speed 60 the
+     gap along the beam is 30px -- wider than a man (a Hero's box is 13-31px
+     across) -- and the Rail flew past people.  Thin walls too: a wsquare is
+     16px (coord.h), which fits inside a 30px gap, so a speed-60 Rail could
+     also punch through a one-block wall without ever noticing it.
+
+     Measured against the Laser as a control.  (The Laser beam is NOT the same
+     size as this one -- checked at runtime, every one of the 16 firing
+     directions: Lance is 40x1/1x40 at speed 40, the Rail 30x1/1x30.  The Lance
+     is its own length per turn and so has no gap at all, which is exactly what
+     makes it the right yardstick for "a projectile that does not miss".)
+
+       exact enumeration of every 1px phase, engine's own Area::overlap and
+       unit velocities, live ground-standing Hero as the target box:
+                              horizontal   diagonal
+         rail@60, stops only     43/60       38/60      = 0.72 / 0.63
+         rail@60, swept          60/60       60/60      = 1.00
+         lance@40, stops only    40/40                  = 1.00  (control)
+
+       live fire through the real Locator collision path, one fresh Hero dummy
+       per shot, every 1px phase covered:
+                              horizontal        diagonal (down-right)
+         rail@60, no sweep     171/240 = 0.71    42/90  = 0.47
+         rail@60 + sweep       240/240 = 1.00   353/353 = 1.00
+         lance@40 (control)    228/228 = 1.00
+
+     Rather than slow the Rail down to hide the gap, Rail::act() (actual.cpp)
+     closes it: every turn it walks the start->end segment in sub-steps no
+     longer than the beam's own extent on each axis and tests the swept boxes
+     against nearby Creatures and against the World's wsquares.  The endpoint
+     stop is left to the engine, and both entry points dedupe through one
+     per-shot hit list, so a pierced Creature is damaged exactly once no matter
+     which phase sees it.  With that in place the speed is a pure feel knob
+     again, and 60 -- the value the Railgun shipped with -- is what it is worth.
+
+       piercing, three Heroes in a row, 120 shots: all three damaged on every
+       shot, always exactly `damage` each.  Double-damage events: 0.
+
+       walls, 480 shots fired from random open squares in all 16 directions,
+       each shot's own position trace checked against the static wsquare map:
+         rail@60, no sweep   165 segments passed through a wall, 132 of them
+                             came out the far side still flying
+         rail@60 + sweep     0 tunnels.  (36 segments still clip a wall corner:
+                             those are the engine's own open_offset() shoving a
+                             shot clear of a wall it did hit, and it dies on the
+                             next act(), which is why none of them get through.)
+       The swept Rails also make a third fewer moves per shot than the unswept
+       ones -- they stop at the wall instead of continuing past it. */
   60, /* speed */
   0,/*soundid*/
   False, /*repeatingsound*/

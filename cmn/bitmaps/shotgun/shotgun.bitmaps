@@ -69,11 +69,15 @@ const GunContext Shotgun::context =
   16, /* ammoMax */
 
   { /** WeaponContext **/
-    SoundNames::PISTOL,
+    SoundNames::SHOTGUN,
 
     { /** ItemContext **/
       True, /* persists */
-      5500, /* coolness */
+      /* coolness -- must stay unique among weapons AND differ from every
+         BuiltInContext coolness (Walker's lasers are 5500); the selection
+         arithmetic in User can only reach a weapon that is strictly cooler
+         or strictly less cool than what is currently wielded. */
+      5300,
       0, /*item use sound */
       { /** FallingContext **/
         {/** MovingContext **/

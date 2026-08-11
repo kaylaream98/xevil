@@ -231,9 +231,14 @@ public:
   /* EFFECTS: Force everything to get drawn. */
   /* NOTE: Used for recovering when pause is turned off. */
 
-  void set_prompt_difficulty(Boolean val);
-  /* EFFECTS: Disable regular drawing of the Viewport and instead prompt the 
-     user for the difficulty level. */
+  void set_prompt_difficulty(Boolean val,int dflt = DIFF_NONE);
+  /* EFFECTS: Disable regular drawing of the Viewport and instead prompt the
+     user for the difficulty level.  dflt is the level highlighted as the
+     current choice (DIFF_NONE == none yet). */
+
+  int prompt_default();
+  /* EFFECTS: The highlighted level, which space/Return accept.  Always a valid
+     level: DIFF_NONE (nothing chosen yet) reads as DIFF_NORMAL. */
      
   void reset();
   /* EFFECTS: Initialize for a new game. */
@@ -403,6 +408,7 @@ protected:
   KeyDispatcher* keyDispatcher;
   UIinput input;
   Boolean promptDifficulty; 
+  int promptDefault;  // Level the prompt highlights (DIFF_NONE == none).
 
   // Takes advantage of fact that menuControls and menuLearnControls are
   // the first two elements of the enumeration.

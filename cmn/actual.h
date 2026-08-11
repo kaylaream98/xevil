@@ -65,7 +65,13 @@ public:
   /* NOTE: Should only be used by the Locator. */
 
   virtual Boolean collidable();
-  virtual Boolean corporeal_attack(PhysicalP killer,int damage); 
+  virtual Boolean corporeal_attack(PhysicalP killer,int damage,AttackFlags);
+  /* NOTE: Was the 2-parameter form, dead since 20 June 2000 for the same
+     reason as AltarOfSin's -- see docs/archaeology.md.  Restoring it is pure
+     hygiene here: collidable() is False, so nothing in the engine ever calls
+     corporeal_attack() on a PhysMover (Locator::collision_checks() and
+     Explosion::act() both test collidable() first, and they are the only two
+     paths that attack something they did not already have in hand). */
   virtual void heat_attack(PhysicalP,int heat,Boolean secondary);
 
   virtual void act();
@@ -156,6 +162,16 @@ public:
 
   virtual Boolean collidable();
   virtual Boolean corporeal_attack(PhysicalP,int);
+  /* NOTE: DELIBERATELY LEFT DEAD.  Like AltarOfSin's, this declaration stopped
+     overriding anything on 20 June 2000 (docs/archaeology.md).  Its body is
+     `return False` -- "you cannot shoot a fire out" -- and unlike PhysMover's
+     and FireExplosion's it is reachable: a Fire built with coll == True (the
+     default, i.e. every flame a burning object sheds in Physical::act()) is
+     collidable, so today a Shot or an Explosion runs the base implementation
+     against its 0 health and puts the flame out.  Restoring the signature
+     would therefore change gameplay, not just tidy the header, so it stays as
+     found and is recorded here instead.  Whoever decides fires should be
+     un-shootable again: add AttackFlags and nothing else. */
   virtual void heat_attack(PhysicalP,int,Boolean);
 
   virtual void draw(CMN_DRAWABLE buffer,Xvars &xvars,int,const Area &area);
@@ -193,7 +209,9 @@ class FireExplosion: public Physical {
   static PhysicalP create(void *,WorldP,LocatorP,const Pos &);
   
   virtual Boolean collidable();
-  virtual Boolean corporeal_attack(PhysicalP,int);
+  virtual Boolean corporeal_attack(PhysicalP,int,AttackFlags);
+  /* NOTE: Same 20 June 2000 story as PhysMover's, and the same reasoning:
+     collidable() is False, so restoring the override is invisible. */
   virtual void heat_attack(PhysicalP,int,Boolean);
 
   virtual const Area &get_area();
@@ -387,7 +405,15 @@ class AltarOfSin: public Heavy {
   static Size get_size_max();
   static PhysicalP create(void *,WorldP,LocatorP,const Pos &);
 
-  virtual Boolean corporeal_attack(PhysicalP,int); 
+  virtual Boolean corporeal_attack(PhysicalP,int,AttackFlags);
+  /* EFFECTS: Punish the attacker (see actual.cpp) and absorb the attack: the
+     Altar never calls up the tree, so it takes no damage from anything. */
+  /* NOTE: This declaration used to be the 2-parameter form, which stopped
+     overriding anything on 20 June 2000 when Physical::corporeal_attack()
+     gained its AttackFlags parameter and actual.h was not updated to match
+     (docs/archaeology.md, "The Altar's wrath, dated").  For 26 years the
+     wrath never ran and the base implementation quietly made the Altar
+     destructible.  Restored. */
 
   virtual void heat_attack(PhysicalP,int,Boolean);
 
@@ -1122,7 +1148,14 @@ class Rail: public Shot {
 
   virtual void collide(PhysicalP other);
   /* NOTE: Damages other but does NOT kill_self -- Rail pierces.  Does not call
-     up the tree. */
+     up the tree.  Only damages a given victim once, see note_hit(). */
+
+  virtual void act();
+  /* EFFECTS: Sweep the segment covered by this turn's move for Creatures and
+     for walls, then move as usual. */
+  /* NOTE: The Rail is fast enough (60px/turn against a 30px beam) that the
+     engine's stop-by-stop collision test leaves a gap it could fly through.
+     See sweep(). */
 
   static Stats &get_stats(void *) {return stats;}
 
@@ -1133,7 +1166,48 @@ class Rail: public Shot {
 
 
  private:
+  enum {
+    // Distinct victims one shot can remember.  A Rail crossing more bodies
+    // than this stops damaging, which is the safe direction: never twice.
+    // (The widest thing in the game is a 15-segment Dragon.)
+    HITS_MAX = 32,
+    // Furthest a collidable Physical's middle can sit from the middle of a
+    // swept box and still overlap it.  Locator::compute_gloc() asserts every
+    // Physical fits in one 64x64 grid cell -- the engine's own collision only
+    // scans one cell in each direction, so nothing bigger can exist -- which
+    // puts the bound at (64 + 30)/2 = 47 per axis, 67 corner to corner.
+    SWEEP_RADIUS_MARGIN = 96,
+    // Ceiling on sub-steps per turn.  The stride rule below needs 43 for a
+    // diagonal Rail at speed 60; this only exists so a Mover-shoved shot
+    // cannot turn one turn into an unbounded loop.
+    SWEEP_STEPS_MAX = 64,
+  };
+
+  void sweep();
+  /* EFFECTS: Walk this turn's start->end segment in sub-steps no longer than
+     the beam's own extent on each axis, so the swept boxes tile the path with
+     no gap.  Damages every Creature the path crosses (once each, see
+     note_hit()) and, if the path crosses a wall the engine's endpoint-only
+     test did not see, stops the Rail at the last open sub-step and kills it
+     there.  Must be called with rawPosNext/areaNext already computed, i.e.
+     after Shot::act(). */
+
+  Boolean sweep_can_hit(PhysicalP other);
+  /* EFFECTS: The subset of Locator::collision_checks()'s filter that can
+     matter to a Rail: aliveness, mapped, collidable, both dont_collide fields
+     (this is where shooter immunity lives), the shooter's composite, and team
+     membership. */
+
+  Boolean note_hit(const Id &id);
+  /* EFFECTS: True the first time this shot is told about id, False every time
+     after.  Piercing means "damage everything crossed, each once"; both the
+     sweep and collide() go through here, which is also what keeps the engine's
+     own endpoint collision from double-damaging what the sweep already hit. */
+
   static void init_x(Xvars&,IXCommand command,void* arg);
+
+  Id hits[HITS_MAX];
+  int hitsNum;
 
   static ShotXdata xdata;
   static Stats stats;

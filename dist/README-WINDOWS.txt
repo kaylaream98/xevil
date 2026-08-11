@@ -35,6 +35,42 @@ GNU GPL.  Then use the menu bar at the top:
 (No sound card?  No problem -- XEvil detects that and plays silently.)
 
 
+CHANGING THE DIFFICULTY
+-----------------------
+EVERY "New Game" asks for the level of difficulty, so you are never stuck with
+an earlier choice.  Your previous pick is HIGHLIGHTED in the list, and [space]
+or [enter] keeps it -- changing difficulty is just "New Game" and a different
+number:
+
+    0 .... trivial          2 .... hard
+    1 .... normal           3 .... bend-over
+
+The choice is remembered between sessions as the "difficulty=" line in
+%APPDATA%\XEvil\.xevilrc, and it comes back as the highlighted default next
+time.  Prefer not to be asked?  Start with  xevil.exe -difficulty hard  (or
+trivial / normal / bend-over) to pin it for that run.
+
+
+FULLSCREEN: F11, AND TWO WAYS TO FILL THE SCREEN
+------------------------------------------------
+F11 toggles fullscreen at any time; xevil.exe -fullscreen starts there.  XEvil
+draws at a fixed, chunky pixel size, so a widescreen monitor leaves some room
+around it -- how that room is used is up to you:
+
+    fill (the default) ..... stretched to the screen with the aspect ratio kept
+                             (a bar only where the screen's shape demands one).
+                             The biggest picture; pixels are no longer uniform.
+                             This is exactly how fullscreen has always looked.
+    crisp .................. whole-pixel scaling, black surround.  Every pixel
+                             of the art stays a perfect square -- sharpest, but
+                             a noticeably smaller picture on a wide monitor.
+
+Choose it with a flag --  xevil.exe -fullscreen_crisp  /  -fullscreen_fill  --
+or permanently by putting a line in %APPDATA%\XEvil\.xevilrc:
+
+    fullscreen_mode=crisp
+
+
 CONTROLS (quickstart)
 ---------------------
 Movement is on the NUMERIC KEYPAD (turn NumLock OFF).  The arrow keys and
@@ -62,6 +98,8 @@ Handy command-line flags (open a Command Prompt in this folder):
     xevil.exe -survival             endless escalating waves
     xevil.exe -human_class dragon   play as a Dragon (try yeti, ninja, ...)
     xevil.exe -fullscreen           start in fullscreen (F11 toggles)
+    xevil.exe -fullscreen_crisp     fullscreen, whole pixels + black surround
+    xevil.exe -difficulty hard      pin the difficulty; skip the New Game prompt
     xevil.exe -scale 2              enlarge everything 2x for big / 4K screens
     xevil.exe -help                 full list of flags
 
@@ -76,7 +114,10 @@ which is normally:
 
     C:\Users\<you>\AppData\Roaming\XEvil\
 
-  * .xevilrc        -- your saved settings (sound, controls, window mode, ...)
+  * .xevilrc        -- your saved settings: sound, window mode, the last
+                       difficulty you picked ("difficulty="), and the
+                       fullscreen look ("fullscreen_mode=fill", the default,
+                       or "=crisp")
   * .xevil_scores   -- the top-10 high-score table, stamped with Hell ranks
 
 The folder is created automatically the first time it is needed.  Delete these

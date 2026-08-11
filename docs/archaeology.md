@@ -911,6 +911,12 @@ The irony is exact: the *source release* everyone could download preserves a
 working Altar; the *game* everyone actually played, built after 20 June 2000,
 does not.
 
+**Postscript:** restored in 2.5 — `AltarOfSin::corporeal_attack` (and the two
+harmless `PhysMover`/`FireExplosion` declarations) now carry the `AttackFlags`
+parameter again, so the wrath runs and the Altar is indestructible once more;
+`Fire`'s is deliberately left as found, because restoring it would change
+gameplay rather than tidy a header (see the note at `cmn/actual.h:164`).
+
 ## `world.bitmaps~` — one file caught mid-edit
 
 The single stray artifact in either archive is an editor backup:

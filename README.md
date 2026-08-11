@@ -22,7 +22,9 @@ last official release (2.02, Steve Hardt & Michael Judge, 2000).
   and distance falloff, and streams all nine original MIDI soundtracks. That
   includes **terraexm**, a track that shipped inside every copy since 2000 but
   was disabled because it *"sounds really painful on cheap sound cards"* —
-  restored to the rotation at last.
+  restored to the rotation at last. The 2.5 content gets six voices of its own,
+  every one derived from the 1994 samples by varispeed and filtering so nothing
+  from outside the original palette enters the mix — see `sounds/README.md`.
 - **Five new weapons:** the **Shotgun** (3-shell spread), the **Railgun**
   (piercing rail shot), the **Cryo Ray** (freezes what it hits), the
   **Proximity Mine** (safe on the ground — *place it* with your item key to
@@ -75,7 +77,7 @@ make
 
 `make` auto-detects your architecture and links the binary at
 `x11/REDHAT_LINUX/xevil` on x86-64 Linux. Click **New Game** in the menu bar to
-start; on UNIX you'll be asked to pick a difficulty first. `make debug` builds
+start; every New Game asks you to pick a difficulty first. `make debug` builds
 an unoptimized `-g` binary into `x11/DEBUG/`; `make clean` removes all build
 output.
 
@@ -99,10 +101,32 @@ Controls** in the menu bar.
 | **End** | cycle to next item |
 | **Page Down** | drop item |
 | **Space** | chat (type a message to other players) |
-| **F1** | pause (shows a PAUSED overlay) |
+| **F1** | pause (shows a PAUSED overlay); any key resumes |
+| **F11** | toggle fullscreen (SDL / Windows build, any time) |
+| **Esc** | close an overlay, or quit |
 
 Two players can share one keyboard: the second player gets the same layout
 mirrored onto the left-hand keys — see **Show Controls**.
+
+### Difficulty
+
+**Every New Game asks** — *Enter level of difficulty:* `0` trivial, `1` normal,
+`2` hard, `3` bend-over. Your previous choice is **highlighted**, and
+**space** or **enter** keeps it, so changing difficulty is just New Game and a
+different number. The choice is remembered as `difficulty=` in `~/.xevilrc`
+(`%APPDATA%\XEvil\.xevilrc` on Windows). Pass `-difficulty hard` to pin one for
+a run and skip the question entirely.
+
+### Fullscreen
+
+**F11** toggles fullscreen at any time in the SDL/Windows build, and
+`-fullscreen` starts there. Two looks, chosen with `fullscreen_mode=` in
+`~/.xevilrc` or with a flag: **fill** (the default, `-fullscreen_fill`)
+stretches the game to the screen with the aspect ratio preserved — the biggest
+picture, with a bar only where the screen's shape demands one. **crisp**
+(`-fullscreen_crisp`) instead draws whole-pixel multiples only, centred in a
+black surround: every pixel of the art stays a perfect square, at the cost of a
+noticeably smaller picture on a widescreen monitor.
 
 ---
 
@@ -158,6 +182,8 @@ list.
 | `-one_each` | Spawn exactly one of every weapon and item — an instant armory. |
 | `-world worlds/vertigo.xew` | Play any handcrafted (or your own) world. |
 | `-scale 3` | Enlarge the whole game 3× (1–4) for big / HiDPI screens. |
+| `-fullscreen_crisp` | Start fullscreen with whole-pixel scaling and a black surround (`-fullscreen_fill` is the default stretch-to-screen look; **F11** toggles either). |
+| `-difficulty hard` | Pin the difficulty for this run instead of being asked at every New Game. |
 | `-kill -machines 20` | Twenty bots, no humans — leave it running as a screensaver. |
 | `-no_sound` / `-sound_volume N` / `-music_volume N` | Silence or balance the new audio (N is 0–100). |
 
@@ -182,11 +208,15 @@ the license screen, pick a **Game style** and press **New Game**.
 - **F1** pauses (with a *PAUSED* overlay), **F11** toggles fullscreen, **Esc**
   closes an overlay. Movement is the numeric keypad (or the arrow keys / WASD);
   see [Controls](#controls) above and **Set Controls** in the menu.
+- Every **New Game** asks for the difficulty with your last choice highlighted
+  (space/enter keeps it) — see [Difficulty](#difficulty).
+- Fullscreen has two looks: `fullscreen_mode=fill` (default) or
+  `fullscreen_mode=crisp` in `.xevilrc` — see [Fullscreen](#fullscreen).
 - No sound card? The audio engine detects that and plays silently — the game
   still runs.
 - Handy flags from a Command Prompt: `xevil.exe -survival`,
-  `xevil.exe -human_class dragon`, `xevil.exe -fullscreen`, `xevil.exe -scale 2`,
-  `xevil.exe -help`.
+  `xevil.exe -human_class dragon`, `xevil.exe -fullscreen`,
+  `xevil.exe -fullscreen_fill`, `xevil.exe -scale 2`, `xevil.exe -help`.
 
 **Building `xevil.exe` yourself** (cross-compiled from these same sources with
 mingw-w64, on Linux or WSL2):
@@ -198,9 +228,13 @@ make dist-windows     # -> dist/xevil.exe + dist/XEvil-2.5-win64.zip
 ```
 
 `make windows` produces the single static `xevil.exe` (SDL2, libgcc, libstdc++
-and all audio linked in). `make dist-windows` also drops the bare exe at
-`dist/xevil.exe` and wraps it with a short `README-WINDOWS.txt` into
-`dist/XEvil-2.5-win64.zip`. The committed static SDL2 lives in
+and all audio linked in). `make dist-windows` also drops a **stripped** copy of
+that exe at `dist/xevil.exe` and wraps it with a short `README-WINDOWS.txt` into
+`dist/XEvil-2.5-win64.zip` — **29.4 MiB**, of which 27.4 MiB is the nine MP3
+soundtracks (already compressed, so they pass through the zip almost unchanged);
+all 33 sound effects together are 0.4 MiB. (The build tree's own
+`sdl/BUILD-WIN/xevil.exe` keeps its symbols; only the dist copy is stripped,
+which is worth ~3.4 MiB of download.) The committed static SDL2 lives in
 `sdl/vendor/SDL2-mingw`, so the cross-compile is reproducible.
 
 ### Option B — WSL2 + WSLg
@@ -233,7 +267,10 @@ or `-scale 3`:
   the mechanics, secrets, and lost pieces uncovered while building 2.5.
 - `docs/xevil-2.5-design.md` — the design notes behind this release.
 - `CHANGELOG.md` — everything that changed from 2.02 to 2.5.
-- `sounds/README.md` — where the recovered audio came from.
+- `sounds/README.md` — where the recovered audio came from, and how the six new
+  2.5 effects were derived from it. `sounds/tools/` holds the generator that
+  produced them (`make_sounds.py --check` reproduces all six byte for byte) and
+  the provenance test that keeps them honest (`family.py --selftest`).
 
 ---
 

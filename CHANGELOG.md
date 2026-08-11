@@ -18,12 +18,27 @@ release, **XEvil 2.02** (Steve Hardt & Michael Judge, 2000). Grouped by area.
   cards."*
 - **WOOB.WAV**, orphaned in the original Win32 resources and never played, is
   now the collapse sound of the new Singularity weapon.
+- **Six new effects for the 2.5 content** — shotgun, railgun, cryo ray, vampire
+  attack and death, and a mine-arming click — so it stops borrowing the pistol's
+  and the ninja's. Each is *derived* from the recovered 1994 samples by
+  varispeed, filtering and layering; no material from outside the original
+  palette is used. The generator ships in `sounds/tools/`
+  (`make_sounds.py --check` reproduces all six byte for byte) alongside
+  `family.py --selftest`, which scores each file against the sources its recipe
+  declares and measures its own ability to reject impostors.
 - New flags: `-no_sound`, `-sound_volume <0-100>`, `-music_volume <0-100>`.
   Network clients request the server's sound relay.
 
 ### Weapons
 - **Shotgun** — fires a three-shell spread.
-- **Railgun** — a single fast, piercing Rail shot.
+- **Railgun** — a single fast, piercing Rail shot. The Rail travels 60px per
+  turn against a 30px beam, and XEvil's collision test only ever looks at the
+  discrete stops, so it used to fly straight past people (measured: it hit on
+  43 of the 60 possible 1px alignments head-on, 38 of 60 diagonally) and
+  through one-block walls. `Rail::act()` now sweeps the segment it crosses each
+  turn in sub-steps no longer than the beam itself: 60/60 alignments hit, each
+  victim damaged exactly once however many sub-steps see it, and a Rail stops
+  at the first wall on its path instead of coming out the far side.
 - **Cryo Ray** — fires an IceBolt that freezes/stuns what it hits.
 - **Singularity** — lobbed like a grenade; anchors, drags every nearby moving
   thing into its collapse (a GravityWell), then explodes. Voiced by WOOB.
@@ -73,6 +88,17 @@ release, **XEvil 2.02** (Steve Hardt & Michael Judge, 2000). Grouped by area.
 - New **Sound**, **Survival**, and **Boss Rush** entries in the menu bar.
 - Version strings bumped to **2.5** (network protocol `XETP2.5X`); `-help` now
   documents flags that were previously undocumented.
+- **Every New Game asks for the difficulty**, with your last choice highlighted
+  as the default that `[space]`/`[enter]` accepts. 2.02 asked once per process
+  and then locked the answer in for the rest of the session — which, once 2.5
+  started remembering the choice in `~/.xevilrc`, meant a player could never
+  change it again. `-difficulty <name>` still pins one and skips the prompt.
+- **Two fullscreen looks** (SDL): `fullscreen_mode=fill` in `~/.xevilrc` (the
+  default, and pixel-for-pixel the classic picture — the game stretched to the
+  screen with the aspect ratio kept) or `fullscreen_mode=crisp` (whole-pixel
+  scaling in a black surround: sharper, smaller). Also `-fullscreen_fill` /
+  `-fullscreen_crisp`; **F11** toggles fullscreen at any time. An `.xevilrc`
+  written before 2.5 has no `fullscreen_mode=` line and so keeps `fill`.
 
 ### Build
 - Plain **`make`** now auto-detects the architecture (`uname -m`) and builds
@@ -87,9 +113,9 @@ release, **XEvil 2.02** (Steve Hardt & Michael Judge, 2000). Grouped by area.
 ### Native Windows port (Wave 4)
 - A **single self-contained `xevil.exe`** for 64-bit Windows, cross-compiled
   from the *same* sources as the Linux build with **mingw-w64**. No DLLs, no
-  asset folders: SDL2, libgcc, libstdc++ and **all 26 sound effects + 9 music
-  tracks are statically linked / embedded into the one file** (~48 MB). Copy it
-  anywhere and double-click.
+  asset folders: SDL2, libgcc, libstdc++ and **all 33 sound effects + 9 music
+  tracks are statically linked / embedded into the one file** (~35 MB stripped;
+  the release zip is 29.4 MiB). Copy it anywhere and double-click.
 - New **SDL2 front end** (`sdl/`) — a portable, X11-independent frontend the
   engine renders through, so the identical `cmn/` engine drives both the Linux
   `xevil-sdl` and the Windows `xevil.exe`. The classic X11/Xlib build is
@@ -120,6 +146,28 @@ release, **XEvil 2.02** (Steve Hardt & Michael Judge, 2000). Grouped by area.
 - Added a virtual destructor to `ITickRenderer`; fixed a delete-`void*` closure
   undefined-behavior bug.
 - Bounded several network-reachable `strcpy`s.
+
+### Bugs inherited from 2.02, fixed here
+- **The Altar of Sin works again.** On 20 June 2000 Steve Hardt gave
+  `Physical::corporeal_attack()` a third parameter and never reopened
+  `actual.h`, so four declarations there silently stopped overriding anything.
+  Three were harmless; the fourth was the Altar's whole second face. For 26
+  years attacking the Altar did nothing to you *and* the base implementation
+  quietly made the Altar destructible — you could shoot it dead. The signature
+  is restored, so the frog/baby-seal curse and the *"BLASPHMER!"* drain run
+  again and the Altar absorbs everything. `Fire`'s matching declaration is
+  deliberately left as found: it is the one of the four that is reachable, so
+  restoring it would change gameplay rather than tidy a header. The full
+  history is in `docs/archaeology.md`, *"The Altar's wrath, dated."*
+- **`User::drop_all()` could hang the game.** The loop dropped weapons until
+  the count reached zero, but `weapon_drop()` is a no-op whenever the selection
+  arithmetic cannot reach a slot — a weapon whose coolness exactly equals the
+  wielder's built-in, or one whose `Id` the Locator no longer resolves, sits in
+  a permanent blind spot. The count then never fell and the loop spun forever;
+  this is what the original *"BUG, can get into an infinite loop here from
+  `User::drop_all`"* note warned about. Both loops now have a forward-progress
+  guarantee, and `weapon_drop()` resolves *reserved* Locator entries too, so a
+  weapon picked up earlier in the same turn is no longer undroppable.
 
 ### Known cosmetic note
 - `config.mk`'s `VERSION` (used only for the packaged tarball name) still reads
